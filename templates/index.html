@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Generator</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <div class="container">
+        <header>
+            <div class="logo">✨</div>
+            <h1>Document Generator</h1>
+            <p>Automated Weekly Bulletin Creator</p>
+        </header>
+
+        <!-- Step 1: Upload -->
+        <section class="card" id="step1">
+            <h2>1. Source Document</h2>
+            <div class="drop-zone" id="dropZone">
+                <div class="icon">📄</div>
+                <p>Drag & Drop your Word Doc here</p>
+                <div class="file-name" id="fileName">No file selected</div>
+                <input type="file" id="fileInput" accept=".docx" hidden>
+            </div>
+        </section>
+
+        <!-- Step 2: Emails -->
+        <section class="card" id="step2">
+            <h2>2. Email Inputs</h2>
+            <div class="input-grid">
+                <div class="input-group">
+                    <label>Organist Email (Prelude/Postlude)</label>
+                    <textarea id="email1" placeholder="Paste prelude, postlude info..."></textarea>
+                </div>
+                <div class="input-group">
+                    <label>Choir Director Email (Anthem/Introit)</label>
+                    <textarea id="email2" placeholder="Paste anthem, introit info..."></textarea>
+                </div>
+            </div>
+
+            <button id="analyzeBtn" class="primary-btn" disabled>
+                Process & Check for Missing Info 🔍
+            </button>
+        </section>
+
+        <!-- Step 3: Missing Info (Phase 2) -->
+        <section class="card hidden" id="step3">
+            <h2>3. Missing Information</h2>
+            <p class="sub-text">The following fields were found in the templates but not in your inputs. Please fill
+                them in or leave blank.</p>
+
+            <div class="input-grid" id="dynamicInputs">
+                <!-- Dynamic fields will inevitably go here -->
+            </div>
+
+            <button id="generateFinalBtn" class="primary-btn">
+                Generate Final Documents 🚀
+            </button>
+        </section>
+
+        <!-- Step 3: Console -->
+        <section class="console-box" id="consoleBox">
+            <div class="console-header">Status Log</div>
+            <div class="console-content" id="logContent">
+                <div class="log-line">Waiting for input...</div>
+            </div>
+        </section>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+
+</html>

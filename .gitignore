@@ -1,0 +1,48 @@
+# Python/runtime
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Local inputs and generated outputs
+inputs/*
+!inputs/.gitkeep
+outputs/*
+!outputs/.gitkeep
+docx_templates/*.docx
+!docx_templates/.gitkeep
+*.log
+server_error.log
+~$*
+
+# Raw sample/reference material with real-world content
+*.pdf
+pdf_analysis.txt
+camera_template.xml
+
+# Local debugging and inspection scripts
+debug_*.py
+inspect_*.py
+analyze_pdf.py
+dump_tags.py
+find_unclosed.py
+fix_requirements.py
+repro_error.py
+test_regex.py
+verify_docxtpl.py
+test_templates/
+
+# Local notes and scratch planning artifacts
+docs/superpowers/
+Parsing Notes.md
+Fields Required for Additional Info.md
+ui_implementation_plan.md
+jinja2_cheatsheet.md
+
+# OS/editor clutter
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
