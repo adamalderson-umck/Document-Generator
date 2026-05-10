@@ -1,0 +1,9 @@
+{
+  "site_name": "Example Church",
+  "site_contact_line": "Church Office | 123 Main Street | 555-0100 | example.org",
+  "pastor_name": "Rev. Example Pastor",
+  "organist_name": "Example Organist",
+  "liturgist_name": "Example Liturgist",
+  "choir_name": "Sanctuary Choir",
+  "default_service_time": "10:30 am"
+}

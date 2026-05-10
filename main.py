@@ -3,6 +3,7 @@ from rich.console import Console
 from rich.prompt import Prompt
 from extractors import parse_source_doc, parse_email_text
 from generators import generate_word_docs
+from site_config import merge_site_config
 
 console = Console()
 
@@ -62,6 +63,7 @@ def main():
     # Merge Data
     data.update(music_data_1)
     data.update(music_data_2)
+    data = merge_site_config(data)
 
     # 6. Generate Outputs
     console.print("\n[bold blue]Generating Documents...[/bold blue]")

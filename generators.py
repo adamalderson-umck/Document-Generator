@@ -1,63 +1,109 @@
+import hashlib
+from pathlib import Path
+
 from docxtpl import DocxTemplate
-import os
+
+
+class OutputFileLockedError(Exception):
+    """Raised when an output document cannot be saved because it is locked."""
+
+
+_template_variable_cache = {}
+
+
+def clear_template_variable_cache():
+    _template_variable_cache.clear()
+
+
+def list_templates(template_dir):
+    template_path = Path(template_dir)
+    return [
+        str(path)
+        for path in sorted(
+            template_path.glob("*.docx"),
+            key=lambda candidate: candidate.name.lower(),
+        )
+        if not path.name.startswith("~")
+    ]
+
+
+def build_output_name(data, template_name):
+    raw_date = str(data.get("date", "Unknown_Date")).replace(",", "").replace("/", "-")
+    raw_time = str(data.get("service_time", "Unknown_Time")).replace(":", "")
+
+    safe_date = "".join(
+        c for c in raw_date if c.isalnum() or c in (" ", "-", "_")
+    ).strip()
+    safe_time = "".join(
+        c for c in raw_time if c.isalnum() or c in (" ", "-", "_")
+    ).strip()
+
+    return f"{safe_date}-{safe_time}_{Path(template_name).name}"
+
+
+def _get_template_variables(template_path):
+    path = Path(template_path)
+    file_bytes = path.read_bytes()
+    cache_key = (
+        str(path.resolve()),
+        path.stat().st_mtime_ns,
+        path.stat().st_size,
+        hashlib.sha256(file_bytes).hexdigest(),
+    )
+    if cache_key not in _template_variable_cache:
+        doc = DocxTemplate(str(path))
+        _template_variable_cache[cache_key] = set(doc.get_undeclared_template_variables())
+    return _template_variable_cache[cache_key]
+
 
 def generate_word_docs(data, template_dir, output_dir):
     """
     Generates Word documents based on templates.
     """
-    templates = [f for f in os.listdir(template_dir) if f.endswith('.docx') and not f.startswith('~')]
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+    generated_paths = []
+    templates = list_templates(template_dir)
 
     if not templates:
         print(f"No templates found in {template_dir}")
-        return
+        return generated_paths
 
-    for temp_name in templates:
+    for template_path in templates:
+        temp_name = Path(template_path).name
         print(f"Processing template: {temp_name}")
-        doc = DocxTemplate(os.path.join(template_dir, temp_name))
+        doc = DocxTemplate(template_path)
 
         try:
-            # docxtpl uses Jinja2, so passing the dictionary 'data' works directly
             doc.render(data)
         except Exception as e:
             raise Exception(f"Error rendering template '{temp_name}': {str(e)}")
 
-        # 1. Get identifiers and sanitize for filename (remove : / \ etc)
-        raw_date = data.get('date', 'Unknown_Date').replace(',', '').replace('/', '-')
-        raw_time = data.get('service_time', 'Unknown_Time').replace(':', '')
+        output_file = output_path / build_output_name(data, temp_name)
 
-        # 2. Construct new filename: "Oct 5 2025-1030 am_TemplateName"
-        # User requested: {{date}}-{{worship time}}
-        # We append the original template name to ensure uniqueness if multiple templates exist.
-        safe_date = "".join([c for c in raw_date if c.isalnum() or c in (' ', '-', '_')]).strip()
-        safe_time = "".join([c for c in raw_time if c.isalnum() or c in (' ', '-', '_')]).strip()
+        try:
+            doc.save(str(output_file))
+        except PermissionError as exc:
+            raise OutputFileLockedError(f"Output file is locked: {output_file}") from exc
 
-        output_name = f"{safe_date}-{safe_time}_{temp_name}"
+        generated_paths.append(str(output_file))
+        print(f"Saved: {output_file.name}")
 
+    return generated_paths
 
-        doc.save(os.path.join(output_dir, output_name))
-        print(f"Saved: {output_name}")
 
 def get_missing_variables(data, template_dir):
     """
     Scans all templates in the directory, finds all Jinja2 tags used,
     and returns a set of tags that are NOT present in the 'data' dictionary.
     """
-    templates = [f for f in os.listdir(template_dir) if f.endswith('.docx') and not f.startswith('~')]
     all_vars = set()
 
-    for temp_name in templates:
+    for template_path in list_templates(template_dir):
         try:
-            doc = DocxTemplate(os.path.join(template_dir, temp_name))
-            # get_undeclared_template_variables returns a set of variable names
-            vars_in_doc = doc.get_undeclared_template_variables()
-            all_vars.update(vars_in_doc)
+            all_vars.update(_get_template_variables(template_path))
         except Exception as e:
-            print(f"Warning: Could not check variables in {temp_name}: {e}")
+            print(f"Warning: Could not check variables in {Path(template_path).name}: {e}")
 
-    # Remove keys that we already have data for
-    # We use data.keys() directly.
-    # Note: Jinja2 variables might use dot notation (e.g. foo.bar),
-    # but based on current project, they seem flat.
-
-    missing = [v for v in all_vars if v not in data]
+    missing = [v for v in all_vars if not v.startswith("_") and v not in data]
     return sorted(missing)
