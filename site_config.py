@@ -12,7 +12,7 @@ def load_site_config(local_path="site_config.local.json", example_path="site_con
     return config
 
 
-def merge_site_config(data, site_config):
-    merged = dict(site_config)
+def merge_site_config(data, site_config=None):
+    merged = dict(load_site_config() if site_config is None else site_config)
     merged.update(data)
     return merged

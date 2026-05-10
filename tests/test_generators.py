@@ -65,6 +65,31 @@ def test_template_variable_discovery_is_cached_by_path_and_modified_time(
     assert len(calls) == 2
 
 
+def test_template_variable_discovery_refreshes_when_content_changes_without_mtime_change(
+    tmp_path, monkeypatch
+):
+    template_path = make_template(tmp_path / "Bulletin.docx")
+    stat = template_path.stat()
+    calls = []
+
+    class FakeDocxTemplate:
+        def __init__(self, path):
+            calls.append(path)
+
+        def get_undeclared_template_variables(self):
+            return {"name"}
+
+    monkeypatch.setattr(generators, "DocxTemplate", FakeDocxTemplate)
+    generators.clear_template_variable_cache()
+
+    assert generators.get_missing_variables({}, tmp_path) == ["name"]
+    template_path.write_bytes(template_path.read_bytes() + b"changed")
+    os.utime(template_path, ns=(stat.st_atime_ns, stat.st_mtime_ns))
+
+    assert generators.get_missing_variables({}, tmp_path) == ["name"]
+    assert len(calls) == 2
+
+
 def test_generate_word_docs_returns_generated_output_paths(tmp_path):
     template_dir = tmp_path / "templates"
     output_dir = tmp_path / "outputs"

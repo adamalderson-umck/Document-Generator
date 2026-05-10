@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 
 from docxtpl import DocxTemplate
@@ -42,7 +43,13 @@ def build_output_name(data, template_name):
 
 def _get_template_variables(template_path):
     path = Path(template_path)
-    cache_key = (str(path.resolve()), path.stat().st_mtime_ns)
+    file_bytes = path.read_bytes()
+    cache_key = (
+        str(path.resolve()),
+        path.stat().st_mtime_ns,
+        path.stat().st_size,
+        hashlib.sha256(file_bytes).hexdigest(),
+    )
     if cache_key not in _template_variable_cache:
         doc = DocxTemplate(str(path))
         _template_variable_cache[cache_key] = set(doc.get_undeclared_template_variables())

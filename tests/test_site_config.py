@@ -46,3 +46,16 @@ def test_merge_site_config_does_not_overwrite_existing_data_values():
         "pastor_name": "Pastor Example",
     }
     assert data == {"church_name": "Parsed Church", "date": "February 15, 2026"}
+
+
+def test_merge_site_config_loads_config_when_not_provided(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "site_config.example.json").write_text(
+        json.dumps({"organist_name": "Example Organist"}),
+        encoding="utf-8",
+    )
+
+    assert merge_site_config({"date": "February 15, 2026"}) == {
+        "organist_name": "Example Organist",
+        "date": "February 15, 2026",
+    }

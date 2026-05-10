@@ -4,7 +4,8 @@
 
 1. Create Word document templates with variables from `data_schema.md`, such as `{{ date }}` or `{{ hymn_1_title }}`.
 2. Save template `.docx` files in `docx_templates/`. These files are ignored by git so local branding and site-specific details stay private.
-3. Create a virtual environment and install dependencies.
+3. Copy `site_config.example.json` to `site_config.local.json` and enter local branding/default values. The local config file is ignored by git.
+4. Create a virtual environment and install dependencies.
 
 ```bash
 python -m venv .venv
@@ -38,8 +39,15 @@ python main.py
 
 For the CLI, place the source `.docx` in `inputs/`; the script reads the first `.docx` it finds.
 
+## Site-Specific Branding
+
+Site names, staff names, contact lines, and other identifying defaults belong in `site_config.local.json`, which is ignored by git. Public-safe templates should use variables such as `{{ pastor_name }}`, `{{ organist_name }}`, `{{ liturgist_name }}`, `{{ choir_name }}`, and `{{ site_contact_line }}` instead of hard-coded identifying text.
+
+Start from `site_config.example.json`, copy it to `site_config.local.json`, and enter local production values there. The app merges those defaults into the parsed service data before checking missing template variables and generating documents.
+
 ## Troubleshooting
 
 * **Variables not filling?** Check `data_schema.md` to ensure template tags match exactly.
 * **Emails not parsing?** Ensure the email contains recognizable headings such as `Prelude`, `Postlude`, `Introit`, or `Anthem`.
+* **Branding not appearing?** Check that `site_config.local.json` exists and that templates use the matching variable names.
 * **Generated file will not save?** Close any existing output document with the same filename and try again.

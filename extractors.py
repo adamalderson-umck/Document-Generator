@@ -41,6 +41,7 @@ HEADER_ALIASES = {
         "introit": "introit",
         "anthem": "anthem",
         "prayer response": "prayer_response",
+        "response": "prayer_response",
         "choral benediction response": "benediction_response",
         "choral benediction": "benediction_response",
         "benediction response": "benediction_response",
@@ -126,20 +127,33 @@ def _match_music_header(line, source_type):
         if normalized == label:
             return aliases[label], ""
 
-        match = re.match(rf"^{re.escape(label)}\s*[:{DASH_CHARS}]\s*(.+)$", normalized)
+        match = re.match(rf"^{re.escape(label)}\s*[:{DASH_CHARS}]\s*(.*)$", normalized)
         if match:
-            raw_match = re.match(rf"^{re.escape(label)}\s*[:{DASH_CHARS}]\s*(.+)$", stripped, re.IGNORECASE)
-            remainder = raw_match.group(1).strip() if raw_match else stripped[len(label):].strip(" :-")
+            raw_match = re.match(rf"^{re.escape(label)}\s*[:{DASH_CHARS}]\s*(.*)$", stripped, re.IGNORECASE)
+            remainder = raw_match.group(1).strip() if raw_match else ""
             return aliases[label], remainder
 
     return None, None
 
 
-def _is_email_boundary(line, source_type):
+def _is_text_or_footer_boundary(line):
     normalized = _clean_label(line)
-    if normalized in TEXT_SECTION_HEADERS:
+    boundary_label = normalized.strip(f" :{DASH_CHARS}")
+    if boundary_label in TEXT_SECTION_HEADERS:
         return True
-    if any(normalized.startswith(prefix) for prefix in FOOTER_PREFIXES):
+
+    for prefix in FOOTER_PREFIXES:
+        if prefix.endswith(":"):
+            if normalized.startswith(prefix):
+                return True
+        elif boundary_label == prefix or boundary_label.startswith(prefix + ","):
+            return True
+
+    return False
+
+
+def _is_email_boundary(line, source_type):
+    if _is_text_or_footer_boundary(line):
         return True
     prefix, _ = _match_music_header(line, source_type)
     return prefix is not None
@@ -150,8 +164,7 @@ def _split_music_sections(text, source_type):
     current_prefix = None
 
     for line in _normalize_email_lines(text):
-        normalized = _clean_label(line)
-        if normalized in TEXT_SECTION_HEADERS or any(normalized.startswith(prefix) for prefix in FOOTER_PREFIXES):
+        if _is_text_or_footer_boundary(line):
             current_prefix = None
             continue
 
@@ -200,6 +213,10 @@ def _split_title_and_composer(main_line):
         title = main_line[: by_match.start()].strip()
         composer = main_line[by_match.end() :].strip()
         return title, _clean_composer(composer)
+
+    if re.search(r"\)\s+[A-Z]", main_line):
+        parts = re.split(r"(?<=\))\s+(?=[A-Z])", main_line, 1)
+        return parts[0].strip(), _clean_composer(parts[1]) if len(parts) > 1 else ""
 
     match = re.search(r",\s*(harm|arr|ed)\.", main_line, flags=re.IGNORECASE)
     if match:
@@ -323,9 +340,14 @@ def parse_email_text(text, source_type="organist"):
     for prefix, lines in sections.items():
         title, composer, details = _parse_music_item(lines)
 
-        data[f"{prefix}_title"] = title
-        data[f"{prefix}_composer"] = composer
-        data[f"{prefix}_details"] = details
-        data[f"{prefix}_personnel"] = details
+        prefixes = [prefix]
+        if prefix == "offertory":
+            prefixes.append("new_spirit")
+
+        for output_prefix in prefixes:
+            data[f"{output_prefix}_title"] = title
+            data[f"{output_prefix}_composer"] = composer
+            data[f"{output_prefix}_details"] = details
+            data[f"{output_prefix}_personnel"] = details
 
     return data

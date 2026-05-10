@@ -8,8 +8,11 @@ const step3 = document.getElementById('step3');
 const dynamicInputs = document.getElementById('dynamicInputs');
 const generateFinalBtn = document.getElementById('generateFinalBtn');
 const logContent = document.getElementById('logContent');
+const warningBox = document.getElementById('warningBox');
+const warningContent = document.getElementById('warningContent');
 
 let sourceFileUploaded = false;
+let sessionId = null;
 
 // Logger
 function log(msg, type = 'info') {
@@ -18,6 +21,22 @@ function log(msg, type = 'info') {
     line.textContent = `> ${msg}`;
     logContent.appendChild(line);
     logContent.scrollTop = logContent.scrollHeight;
+}
+
+function renderWarnings(warnings) {
+    warningContent.innerHTML = '';
+    if (!warnings || warnings.length === 0) {
+        warningBox.classList.add('hidden');
+        return;
+    }
+
+    warnings.forEach(message => {
+        const line = document.createElement('div');
+        line.className = 'warning-line';
+        line.textContent = message;
+        warningContent.appendChild(line);
+    });
+    warningBox.classList.remove('hidden');
 }
 
 // Drag & Drop
@@ -63,6 +82,8 @@ async function uploadSource(file) {
         if (!res.ok) throw new Error("Upload failed");
 
         const data = await res.json();
+        renderWarnings(data.warnings);
+        sessionId = data.session_id;
         fileName.textContent = file.name + " ✅";
         log(`Parsed ${Object.keys(data.data).length} items from source!`, 'success');
         sourceFileUploaded = true;
@@ -76,7 +97,7 @@ async function uploadSource(file) {
 
 // State Check
 function checkReady() {
-    if (sourceFileUploaded) {
+    if (sourceFileUploaded && sessionId) {
         analyzeBtn.disabled = false;
         analyzeBtn.textContent = "Process & Check for Missing Info 🔍";
     }
@@ -93,6 +114,7 @@ analyzeBtn.addEventListener('click', async () => {
     dynamicInputs.innerHTML = '';
 
     const formData = new FormData();
+    formData.append('session_id', sessionId);
     formData.append('email_1', email1.value);
     formData.append('email_2', email2.value);
 
@@ -103,6 +125,11 @@ analyzeBtn.addEventListener('click', async () => {
         });
 
         const data = await res.json();
+        renderWarnings(data.warnings);
+
+        if (!res.ok) {
+            throw new Error(data.detail || "Analysis failed");
+        }
 
         if (data.status === 'needs_input') {
             log(`Found ${data.missing_fields.length} missing fields!`, 'warning');
@@ -174,14 +201,22 @@ async function triggerFinalGeneration(extraFields) {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ extra_fields: extraFields })
+            body: JSON.stringify({ session_id: sessionId, extra_fields: extraFields })
         });
 
         const data = await res.json();
+        renderWarnings(data.warnings);
+
+        if (!res.ok) {
+            throw new Error(data.detail || "Generation failed");
+        }
 
         if (data.status === 'success') {
             log("Success! Documents created.", 'success');
             log(`Output: ${data.output_dir}`);
+            if (data.generated_files) {
+                data.generated_files.forEach(path => log(`Created: ${path}`));
+            }
             generateFinalBtn.textContent = "Done! Open Outputs Folder";
             generateFinalBtn.disabled = false;
         } else {

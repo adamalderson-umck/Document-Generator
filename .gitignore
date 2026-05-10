@@ -13,6 +13,9 @@ outputs/*
 !outputs/.gitkeep
 docx_templates/*.docx
 !docx_templates/.gitkeep
+site_config.local.json
+docx_templates_private_backup/
+template_identity_forbidden.local.txt
 *.log
 server_error.log
 ~$*

@@ -5,9 +5,10 @@ from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
 import shutil
 import os
-import json
+from uuid import uuid4
 from extractors import parse_source_doc, parse_email_text
-from generators import generate_word_docs
+from generators import generate_word_docs, get_missing_variables
+from site_config import merge_site_config
 
 app = FastAPI()
 
@@ -26,8 +27,8 @@ os.makedirs(outputs_dir, exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# Global Store (Simple in-memory for this local tool)
-current_data = {}
+# Simple in-memory run store for this local single-user tool.
+sessions = {}
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -52,16 +53,25 @@ async def upload_source(file: UploadFile = File(...)):
         # Parse immediately
         extracted_data = parse_source_doc(file_path)
 
-        # Update global state
-        current_data.clear()
-        current_data.update(extracted_data)
+        session_id = uuid4().hex
+        sessions[session_id] = {
+            "data": extracted_data,
+            "filename": file.filename,
+        }
 
-        return {"status": "success", "filename": file.filename, "data": extracted_data}
+        return {
+            "status": "success",
+            "session_id": session_id,
+            "filename": file.filename,
+            "data": extracted_data,
+            "warnings": extracted_data.get("_parse_warnings", []),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/analyze_inputs")
 async def analyze_inputs(
+    session_id: str = Form(...),
     email_1: str = Form(""),
     email_2: str = Form("")
 ):
@@ -69,33 +79,42 @@ async def analyze_inputs(
     Step 2a: Analyze inputs and detect missing fields.
     """
     try:
+        session = sessions.get(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Upload a source document before analyzing inputs.")
+
+        current_data = dict(session["data"])
+
         # 1. Parse Emails
         music_1 = parse_email_text(email_1, source_type="organist")
         music_2 = parse_email_text(email_2, source_type="choir")
 
-        # 2. Merge with current source data
-        # We copy to avoid mutating the global state permanently until finalization,
-        # but for this simple app, updating global is fine/expected.
         current_data.update(music_1)
         current_data.update(music_2)
+        current_data = merge_site_config(current_data)
+        session["data"] = current_data
 
         # 3. Detect Missing Variables
-        from generators import get_missing_variables
         missing_fields = get_missing_variables(current_data, docx_templates_dir)
+        warnings = current_data.get("_parse_warnings", [])
 
         if missing_fields:
             return {
                 "status": "needs_input",
                 "missing_fields": missing_fields,
-                "current_data": current_data
+                "current_data": current_data,
+                "warnings": warnings,
             }
         else:
             # No missing fields? We can signal frontend to proceed or just return success
             return {
                 "status": "ready",
-                "current_data": current_data
+                "current_data": current_data,
+                "warnings": warnings,
             }
 
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -109,7 +128,14 @@ async def generate_final(request: Request):
     """
     try:
         payload = await request.json()
+        session_id = payload.get("session_id")
         extra_fields = payload.get("extra_fields", {})
+
+        session = sessions.get(session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Upload a source document before generating.")
+
+        current_data = dict(session["data"])
 
         # Update global data with manual inputs
         # NEW: Apply formatting to hymn numbers if they appear in extra_fields
@@ -121,15 +147,21 @@ async def generate_final(request: Request):
                 extra_fields[key] = format_hymn_number(value)
 
         current_data.update(extra_fields)
+        current_data = merge_site_config(current_data)
+        session["data"] = current_data
 
         # Generate Docs
-        generate_word_docs(current_data, docx_templates_dir, outputs_dir)
+        generated_files = generate_word_docs(current_data, docx_templates_dir, outputs_dir)
 
         return {
             "status": "success",
             "message": "Documents Generated Successfully!",
-            "output_dir": outputs_dir
+            "output_dir": outputs_dir,
+            "generated_files": generated_files or [],
+            "warnings": current_data.get("_parse_warnings", []),
         }
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         with open("server_error.log", "w") as f:

@@ -170,6 +170,27 @@ textarea:focus {
     cursor: not-allowed;
 }
 
+/* Review Notes */
+.warning-box {
+    border: 1px solid rgba(250, 204, 21, 0.35);
+    background: rgba(113, 63, 18, 0.28);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.warning-header {
+    color: #fde68a;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+}
+
+.warning-line {
+    color: #fef3c7;
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+}
+
 /* Console */
 .console-box {
     background: #000;
