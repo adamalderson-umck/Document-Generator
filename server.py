@@ -3,6 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
+from pydantic import BaseModel, Field
 import shutil
 import os
 from uuid import uuid4
@@ -29,6 +30,12 @@ templates = Jinja2Templates(directory="templates")
 
 # Simple in-memory run store for this local single-user tool.
 sessions = {}
+
+
+class GenerateFinalPayload(BaseModel):
+    session_id: str = Field(min_length=1)
+    extra_fields: dict[str, str] = Field(default_factory=dict)
+
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -121,15 +128,14 @@ async def analyze_inputs(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/generate_final")
-async def generate_final(request: Request):
+async def generate_final(payload: GenerateFinalPayload):
     """
     Step 2b: Receive final data (including manual inputs) and generate.
     We expect a JSON body now, not Form data, to easily handle dynamic fields.
     """
     try:
-        payload = await request.json()
-        session_id = payload.get("session_id")
-        extra_fields = payload.get("extra_fields", {})
+        session_id = payload.session_id
+        extra_fields = dict(payload.extra_fields)
 
         session = sessions.get(session_id)
         if not session:
