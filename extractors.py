@@ -226,6 +226,8 @@ def _split_title_and_composer(main_line):
 
 
 def _clean_detail_line(line):
+    if re.fullmatch(r"\s*\[.*\]\s*", line):
+        return ""
     cleaned = line.strip().strip("[]").strip("()")
     return re.sub(r"\s+", " ", cleaned).strip()
 

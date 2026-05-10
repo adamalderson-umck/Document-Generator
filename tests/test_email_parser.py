@@ -71,7 +71,7 @@ def test_choir_email_stops_at_text_sections_and_keeps_details_separate():
 
     assert data["introit_title"] == "O God of Every Nation (Llangloffan)"
     assert data["introit_composer"] == "Welsh Hymn Melody"
-    assert data["introit_details"] == "Harm. by David Evans; Hymn 435, vs. 1 - with organ - intro. last line"
+    assert data["introit_details"] == "Harm. by David Evans"
     assert data["anthem_title"] == "Bread of the World in Mercy Broken"
     assert data["anthem_composer"] == "Aneurin Bodycombe"
     assert data["prayer_response_title"] == ""
@@ -183,3 +183,19 @@ God's Bright Star (Hodie) Piae Cantiones
 
     assert data["anthem_title"] == "God's Bright Star (Hodie)"
     assert data["anthem_composer"] == "Piae Cantiones"
+
+
+def test_bracketed_email_detail_lines_are_ignored():
+    text = """
+Anthem
+Come, Thou Fount     John Wyeth
+[Choir sings from loft]
+With flute
+"""
+
+    data = parse_email_text(text, source_type="choir")
+
+    assert data["anthem_title"] == "Come, Thou Fount"
+    assert data["anthem_composer"] == "John Wyeth"
+    assert data["anthem_details"] == "With flute"
+    assert "Choir sings from loft" not in data["anthem_personnel"]
