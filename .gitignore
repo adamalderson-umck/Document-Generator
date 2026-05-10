@@ -9,6 +9,7 @@ __pycache__/
 # Local inputs and generated outputs
 inputs/*
 !inputs/.gitkeep
+inputs/.sessions/
 outputs/*
 !outputs/.gitkeep
 docx_templates/*.docx

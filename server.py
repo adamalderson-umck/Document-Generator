@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
 from pydantic import BaseModel, Field
+import json
 import shutil
 import os
 from uuid import uuid4
@@ -23,6 +24,8 @@ docx_templates_dir = os.path.join(BASE_DIR, "docx_templates")
 # Ensure dirs exist
 os.makedirs(inputs_dir, exist_ok=True)
 os.makedirs(outputs_dir, exist_ok=True)
+session_store_dir = os.path.join(inputs_dir, ".sessions")
+last_session_file = os.path.join(session_store_dir, "last_session_id.txt")
 
 # 2. Mount Static & Templates (HTML)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -30,16 +33,95 @@ templates = Jinja2Templates(directory="templates")
 
 # Simple in-memory run store for this local single-user tool.
 sessions = {}
+last_session_id = None
 
 
 class GenerateFinalPayload(BaseModel):
-    session_id: str = Field(min_length=1)
+    session_id: str | None = Field(default=None, min_length=1)
     extra_fields: dict[str, str] = Field(default_factory=dict)
+
+
+def resolve_session(session_id):
+    global last_session_id
+    if session_id:
+        session = sessions.get(session_id) or load_session(session_id)
+        if session:
+            last_session_id = session_id
+        return session
+
+    if last_session_id and last_session_id in sessions:
+        return sessions[last_session_id]
+
+    remembered_session_id = last_session_id or load_last_session_id()
+    if remembered_session_id:
+        session = sessions.get(remembered_session_id) or load_session(remembered_session_id)
+        if session:
+            last_session_id = remembered_session_id
+            return session
+
+    if len(sessions) == 1:
+        last_session_id = next(iter(sessions.keys()))
+        return next(iter(sessions.values()))
+    return None
+
+
+def _is_safe_session_id(session_id):
+    return isinstance(session_id, str) and bool(session_id) and all(
+        char.isalnum() or char in ("-", "_") for char in session_id
+    )
+
+
+def _session_path(session_id):
+    if not _is_safe_session_id(session_id):
+        return None
+    return os.path.join(session_store_dir, f"{session_id}.json")
+
+
+def load_last_session_id():
+    try:
+        with open(last_session_file, encoding="utf-8") as file:
+            session_id = file.read().strip()
+    except FileNotFoundError:
+        return None
+    return session_id if _is_safe_session_id(session_id) else None
+
+
+def load_session(session_id):
+    session_path = _session_path(session_id)
+    if not session_path or not os.path.exists(session_path):
+        return None
+
+    with open(session_path, encoding="utf-8") as file:
+        session = json.load(file)
+    sessions[session_id] = session
+    return session
+
+
+def save_session(session_id, session):
+    global last_session_id
+    session_path = _session_path(session_id)
+    if not session_path:
+        return
+
+    os.makedirs(session_store_dir, exist_ok=True)
+    with open(session_path, "w", encoding="utf-8") as file:
+        json.dump(session, file)
+    with open(last_session_file, "w", encoding="utf-8") as file:
+        file.write(session_id)
+    sessions[session_id] = session
+    last_session_id = session_id
 
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    asset_version = str(max(
+        os.path.getmtime(os.path.join(BASE_DIR, "static", "script.js")),
+        os.path.getmtime(os.path.join(BASE_DIR, "static", "style.css")),
+    ))
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "asset_version": asset_version},
+    )
 
 @app.get("/favicon.ico")
 async def favicon():
@@ -65,6 +147,7 @@ async def upload_source(file: UploadFile = File(...)):
             "data": extracted_data,
             "filename": file.filename,
         }
+        save_session(session_id, sessions[session_id])
 
         return {
             "status": "success",
@@ -78,7 +161,7 @@ async def upload_source(file: UploadFile = File(...)):
 
 @app.post("/analyze_inputs")
 async def analyze_inputs(
-    session_id: str = Form(...),
+    session_id: str | None = Form(None),
     email_1: str = Form(""),
     email_2: str = Form("")
 ):
@@ -86,7 +169,7 @@ async def analyze_inputs(
     Step 2a: Analyze inputs and detect missing fields.
     """
     try:
-        session = sessions.get(session_id)
+        session = resolve_session(session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Upload a source document before analyzing inputs.")
 
@@ -100,6 +183,8 @@ async def analyze_inputs(
         current_data.update(music_2)
         current_data = merge_site_config(current_data)
         session["data"] = current_data
+        if session_id or last_session_id:
+            save_session(session_id or last_session_id, session)
 
         # 3. Detect Missing Variables
         missing_fields = get_missing_variables(current_data, docx_templates_dir)
@@ -134,10 +219,9 @@ async def generate_final(payload: GenerateFinalPayload):
     We expect a JSON body now, not Form data, to easily handle dynamic fields.
     """
     try:
-        session_id = payload.session_id
         extra_fields = dict(payload.extra_fields)
 
-        session = sessions.get(session_id)
+        session = resolve_session(payload.session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Upload a source document before generating.")
 
@@ -155,6 +239,8 @@ async def generate_final(payload: GenerateFinalPayload):
         current_data.update(extra_fields)
         current_data = merge_site_config(current_data)
         session["data"] = current_data
+        if payload.session_id or last_session_id:
+            save_session(payload.session_id or last_session_id, session)
 
         # Generate Docs
         generated_files = generate_word_docs(current_data, docx_templates_dir, outputs_dir)

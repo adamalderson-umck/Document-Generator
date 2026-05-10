@@ -39,6 +39,31 @@ function renderWarnings(warnings) {
     warningBox.classList.remove('hidden');
 }
 
+function getErrorMessage(data, fallback) {
+    const detail = data && data.detail;
+    if (!detail) {
+        return fallback;
+    }
+    if (typeof detail === 'string') {
+        return detail;
+    }
+    if (Array.isArray(detail)) {
+        return detail.map(item => {
+            if (typeof item === 'string') {
+                return item;
+            }
+            if (item && item.msg) {
+                return item.msg;
+            }
+            return JSON.stringify(item);
+        }).join('; ');
+    }
+    if (detail.msg) {
+        return detail.msg;
+    }
+    return JSON.stringify(detail);
+}
+
 // Drag & Drop
 dropZone.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', handleFileSelect);
@@ -128,7 +153,7 @@ analyzeBtn.addEventListener('click', async () => {
         renderWarnings(data.warnings);
 
         if (!res.ok) {
-            throw new Error(data.detail || "Analysis failed");
+            throw new Error(getErrorMessage(data, "Analysis failed"));
         }
 
         if (data.status === 'needs_input') {
@@ -208,7 +233,7 @@ async function triggerFinalGeneration(extraFields) {
         renderWarnings(data.warnings);
 
         if (!res.ok) {
-            throw new Error(data.detail || "Generation failed");
+            throw new Error(getErrorMessage(data, "Generation failed"));
         }
 
         if (data.status === 'success') {
