@@ -1,6 +1,7 @@
 import pytest
 from pydantic import ValidationError
 import asyncio
+from fastapi import HTTPException
 
 import server
 from server import GenerateFinalPayload
@@ -89,7 +90,13 @@ def test_generate_final_recovers_session_after_memory_reset(tmp_path, monkeypatc
     monkeypatch.setattr(server, "session_store_dir", str(tmp_path))
     monkeypatch.setattr(server, "last_session_file", str(tmp_path / "last_session_id.txt"))
     monkeypatch.setattr(server, "merge_site_config", lambda data: dict(data))
-    monkeypatch.setattr(server, "generate_word_docs", lambda data, _templates, _outputs: ["output.docx"])
+
+    def fake_generate_word_docs(data, _templates, _outputs):
+        output_path = tmp_path / "output.docx"
+        output_path.write_text("generated", encoding="utf-8")
+        return [str(output_path)]
+
+    monkeypatch.setattr(server, "generate_word_docs", fake_generate_word_docs)
     session = {"data": {"date": "May 10, 2026"}, "filename": "source.docx"}
 
     server.save_session("abc123", session)
@@ -103,5 +110,31 @@ def test_generate_final_recovers_session_after_memory_reset(tmp_path, monkeypatc
     )
 
     assert result["status"] == "success"
-    assert result["generated_files"] == ["output.docx"]
+    assert result["generated_files"] == [str(tmp_path / "output.docx")]
     assert server.sessions["abc123"]["data"]["hymn_1_num"] == "UMH 95"
+
+
+def test_verify_generated_files_rejects_empty_generation_result():
+    with pytest.raises(HTTPException) as exc_info:
+        server.verify_generated_files([])
+
+    assert exc_info.value.status_code == 500
+    assert "no files were created" in exc_info.value.detail
+
+
+def test_generate_final_rejects_missing_reported_output_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(server, "session_store_dir", str(tmp_path))
+    monkeypatch.setattr(server, "last_session_file", str(tmp_path / "last_session_id.txt"))
+    monkeypatch.setattr(server, "merge_site_config", lambda data: dict(data))
+    monkeypatch.setattr(
+        server,
+        "generate_word_docs",
+        lambda data, _templates, _outputs: [str(tmp_path / "missing.docx")],
+    )
+    server.save_session("abc123", {"data": {"date": "May 10, 2026"}, "filename": "source.docx"})
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(server.generate_final(GenerateFinalPayload.model_validate({})))
+
+    assert exc_info.value.status_code == 500
+    assert "not found" in exc_info.value.detail

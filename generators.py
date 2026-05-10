@@ -8,6 +8,14 @@ class OutputFileLockedError(Exception):
     """Raised when an output document cannot be saved because it is locked."""
 
 
+class NoTemplatesFoundError(Exception):
+    """Raised when generation is requested without any template documents."""
+
+
+class GeneratedOutputMissingError(Exception):
+    """Raised when a reported output document is not present after saving."""
+
+
 _template_variable_cache = {}
 
 
@@ -66,8 +74,7 @@ def generate_word_docs(data, template_dir, output_dir):
     templates = list_templates(template_dir)
 
     if not templates:
-        print(f"No templates found in {template_dir}")
-        return generated_paths
+        raise NoTemplatesFoundError(f"No templates found in {template_dir}")
 
     for template_path in templates:
         temp_name = Path(template_path).name
@@ -85,6 +92,9 @@ def generate_word_docs(data, template_dir, output_dir):
             doc.save(str(output_file))
         except PermissionError as exc:
             raise OutputFileLockedError(f"Output file is locked: {output_file}") from exc
+
+        if not output_file.exists():
+            raise GeneratedOutputMissingError(f"Generated output was not found: {output_file}")
 
         generated_paths.append(str(output_file))
         print(f"Saved: {output_file.name}")

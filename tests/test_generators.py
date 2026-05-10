@@ -113,6 +113,51 @@ def test_generate_word_docs_returns_generated_output_paths(tmp_path):
     assert Path(generated[0]).exists()
 
 
+def test_generate_word_docs_raises_when_no_templates_are_found(tmp_path):
+    template_dir = tmp_path / "templates"
+    output_dir = tmp_path / "outputs"
+    template_dir.mkdir()
+    output_dir.mkdir()
+
+    with pytest.raises(generators.NoTemplatesFoundError) as exc_info:
+        generators.generate_word_docs(
+            {"date": "February 15, 2026", "service_time": "10:30 am"},
+            template_dir,
+            output_dir,
+        )
+
+    assert str(template_dir) in str(exc_info.value)
+
+
+def test_generate_word_docs_raises_when_saved_output_is_missing(tmp_path, monkeypatch):
+    template_dir = tmp_path / "templates"
+    output_dir = tmp_path / "outputs"
+    template_dir.mkdir()
+    output_dir.mkdir()
+    make_template(template_dir / "Bulletin.docx")
+
+    class FakeDocxTemplate:
+        def __init__(self, path):
+            self.path = path
+
+        def render(self, data):
+            pass
+
+        def save(self, path):
+            pass
+
+    monkeypatch.setattr(generators, "DocxTemplate", FakeDocxTemplate)
+
+    with pytest.raises(generators.GeneratedOutputMissingError) as exc_info:
+        generators.generate_word_docs(
+            {"date": "February 15, 2026", "service_time": "10:30 am"},
+            template_dir,
+            output_dir,
+        )
+
+    assert "February 15 2026-1030 am_Bulletin.docx" in str(exc_info.value)
+
+
 def test_generate_word_docs_wraps_permission_error_as_output_file_locked_error(
     tmp_path, monkeypatch
 ):

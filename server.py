@@ -112,6 +112,22 @@ def save_session(session_id, session):
     last_session_id = session_id
 
 
+def verify_generated_files(generated_files):
+    if not generated_files:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Generation finished but no files were created in {outputs_dir}.",
+        )
+
+    missing_files = [path for path in generated_files if not os.path.exists(path)]
+    if missing_files:
+        raise HTTPException(
+            status_code=500,
+            detail="Generation finished but these output files were not found: "
+            + ", ".join(missing_files),
+        )
+
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     asset_version = str(max(
@@ -244,6 +260,7 @@ async def generate_final(payload: GenerateFinalPayload):
 
         # Generate Docs
         generated_files = generate_word_docs(current_data, docx_templates_dir, outputs_dir)
+        verify_generated_files(generated_files)
 
         return {
             "status": "success",
