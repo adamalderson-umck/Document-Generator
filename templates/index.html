@@ -22,6 +22,33 @@
             <p>Automated Weekly Bulletin Creator</p>
         </header>
 
+        <section class="card hidden" id="weeklyReviewSection">
+            <div class="section-heading">
+                <div>
+                    <h2>Weekly Review</h2>
+                    <p class="sub-text" id="weeklyReviewSummary">No weekly review loaded.</p>
+                </div>
+                <button id="showManualBtn" class="secondary-btn" type="button">Manual Mode</button>
+            </div>
+
+            <div class="review-meta" id="weeklyReviewSources"></div>
+
+            <h3>Needs Attention</h3>
+            <div class="review-fields" id="attentionFields"></div>
+
+            <details class="all-fields-panel">
+                <summary>All Fields</summary>
+                <div class="review-fields all-review-fields" id="allReviewFields"></div>
+            </details>
+
+            <div class="button-row">
+                <button id="saveReviewBtn" class="secondary-btn" type="button">Save Review</button>
+                <button id="generateFromReviewBtn" class="primary-btn" type="button">Generate Final Documents</button>
+            </div>
+        </section>
+
+        <div id="manualWorkflow">
+
         <!-- Step 1: Upload -->
         <section class="card" id="step1">
             <h2>1. Source Document</h2>
@@ -66,6 +93,8 @@
                 Generate Final Documents 🚀
             </button>
         </section>
+
+        </div>
 
         <section class="warning-box hidden" id="warningBox">
             <div class="warning-header">Review Notes</div>
