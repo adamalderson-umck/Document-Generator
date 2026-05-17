@@ -23,7 +23,7 @@ The new workflow should reuse `generate_word_docs()` and the template-variable d
 Every Friday morning, a Codex automation targets the upcoming Sunday.
 
 1. Determine the upcoming Sunday service date from the automation run date.
-2. Search the local Outlook PST store `Adam Alderson`.
+2. Search the local Outlook PST store `Adam Alderson`. If the store is not currently mounted in the Outlook profile, attempt to mount `C:\Users\kentu\AppData\Local\Microsoft\Outlook\Adam Alderson.pst` through Outlook COM and then re-scan the stores.
 3. Find the source worship-notes email in `Inbox\Staff\Nathan` using the subject marker `[Month] [DD] worship notes`, such as `May 24 worship notes`.
 4. Select the `10:30` `.docx` attachment from that email.
 5. Search music emails in `Inbox\Music` for the week preceding the service date.
@@ -31,7 +31,9 @@ Every Friday morning, a Codex automation targets the upcoming Sunday.
 7. Write a review JSON file to `inputs/weekly_reviews/YYYY-MM-DD-review.json`, where the date is the target service date.
 8. Leave final document generation to the GUI.
 
-If the Nathan email or `10:30` attachment cannot be found, the automation should fall back to the newest plausible `.docx` already in `inputs/` and record that fallback in `_review`.
+If the PST cannot be mounted or the `Adam Alderson` store still cannot be found, the automation should not attempt a raw PST parse in version 1. It should write the review JSON with blank source-derived fields, set `_review.status` to `source_missing`, and include a clear note in `_review.sources` or `_review.notes`.
+
+If the Nathan email or `10:30` attachment cannot be found after the store is available, the automation should fall back to the newest plausible `.docx` already in `inputs/` and record that fallback in `_review`.
 
 Special mid-week services are out of scope for the recurring automation. They remain one-off workflows.
 
@@ -155,6 +157,7 @@ Implementation should include tests for:
 - loading and saving weekly review JSON files
 - attention-field classification
 - generation from a review JSON
+- auto-mounting the known PST path when the Outlook store is not already mounted
 - fallback behavior when source email or attachment is missing
 - skill validation with the Codex skill validation script
 

@@ -4,7 +4,7 @@
 
 **Goal:** Build an automation-first weekly review workflow where Codex prepares `inputs/weekly_reviews/YYYY-MM-DD-review.json` with all previously supported worship-order and music fields plus current template variables, the GUI opens that review, and the user edits attention fields before generating documents.
 
-**Architecture:** Add a reusable Codex skill named `weekly-document-review` to hold the recurring workflow rules, with the cron automation reduced to a small scheduler prompt. Add a focused `weekly_review.py` module for review-file paths, validation, attention-field metadata, and generator-data conversion. Extend `server.py` with review JSON endpoints that reuse the existing `generate_word_docs()` path. Update the GUI to prefer the latest weekly review while preserving the current manual upload/paste workflow as a fallback.
+**Architecture:** Add a reusable Codex skill named `weekly-document-review` to hold the recurring workflow rules, with the cron automation reduced to a small scheduler prompt. Add a focused `weekly_review.py` module for review-file paths, validation, attention-field metadata, and generator-data conversion. Extend `server.py` with review JSON endpoints that reuse the existing `generate_word_docs()` path. Use Outlook COM for source export, including an automatic mount attempt for the known PST path before declaring sources missing.
 
 **Tech Stack:** Python 3, FastAPI, Pydantic, `docxtpl`, `python-docx`, vanilla JavaScript, PowerShell Outlook COM for the local source-export helper, Codex cron automation.
 
@@ -22,7 +22,7 @@
 - Modify `templates/index.html`: add review-first GUI sections while keeping manual mode available.
 - Modify `static/script.js`: load latest review on startup, render attention/all-field editors, save review edits, generate from review JSON, and preserve manual workflow behavior.
 - Modify `static/style.css`: add restrained review-mode styles using existing visual vocabulary.
-- Create `tools/export_weekly_sources.ps1`: optional deterministic Outlook source export helper for the Codex automation to call before extraction.
+- Create `tools/export_weekly_sources.ps1`: optional deterministic Outlook source export helper for the Codex automation to call before extraction, including a fallback that mounts the known PST file when the store is not already visible.
 - Create `docs/automation/weekly-review-prompt.md`: thin stored prompt that invokes the `weekly-document-review` skill from the Codex cron automation.
 
 ## Task 0: Weekly Document Review Skill
@@ -73,6 +73,7 @@ description: Prepare weekly church document review JSON packets for Document Gen
 ## Guardrails
 
 - Keep `CONTEXT.md` as the source of truth for music language; do not copy its detailed terminology into this skill.
+- If the Outlook store is not mounted, use the known PST path fallback described in `references/source-selection.md` before declaring sources missing.
 - Use `*_details` only for secondary composer, arranger, harmonizer, editor, or additional-composer credit when `*_composer` has a primary credit.
 - Leave normally absent fields blank.
 - Record source metadata in `_review.sources`; do not include full email bodies in the final review JSON.
@@ -89,6 +90,16 @@ Replace `C:\Users\kentu\.codex\skills\weekly-document-review\references\source-s
 ## Outlook Store
 
 Use the local Outlook PST store named `Adam Alderson`.
+
+If the store is not already mounted in the Outlook profile, attempt to mount:
+
+```text
+C:\Users\kentu\AppData\Local\Microsoft\Outlook\Adam Alderson.pst
+```
+
+Use Outlook COM `Namespace.AddStoreEx(...)` for this fallback, then re-scan the Outlook stores before looking for folders.
+
+If the PST path is missing or Outlook cannot mount it, do not attempt direct PST parsing in version 1. Continue by writing the review JSON with `_review.status = "source_missing"` and a note explaining that the Outlook store was unavailable.
 
 ## Source Worship Notes
 
@@ -1350,6 +1361,7 @@ param(
   [string]$ServiceDate,
 
   [string]$StoreName = "Adam Alderson",
+  [string]$PstPath = "C:\Users\kentu\AppData\Local\Microsoft\Outlook\Adam Alderson.pst",
   [string]$OutputRoot = "tmp/weekly_review_sources"
 )
 
@@ -1361,16 +1373,35 @@ New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 
 $outlook = New-Object -ComObject Outlook.Application
 $ns = $outlook.Session
-$store = $null
-for ($i = 1; $i -le $ns.Stores.Count; $i++) {
-  $candidate = $ns.Stores.Item($i)
-  if ($candidate.DisplayName -eq $StoreName) {
-    $store = $candidate
-    break
+$pstAutoMounted = $false
+
+function Get-OutlookStore($namespace, [string]$storeName, [string]$pstPath) {
+  $resolvedPstPath = if ($pstPath) { [System.IO.Path]::GetFullPath($pstPath) } else { "" }
+  for ($i = 1; $i -le $namespace.Stores.Count; $i++) {
+    $candidate = $namespace.Stores.Item($i)
+    $displayName = try { [string]$candidate.DisplayName } catch { "" }
+    $filePath = try { [System.IO.Path]::GetFullPath([string]$candidate.FilePath) } catch { "" }
+    if ($displayName -eq $storeName -or ($resolvedPstPath -and $filePath -eq $resolvedPstPath)) {
+      return $candidate
+    }
   }
+  return $null
 }
+
+$store = Get-OutlookStore $ns $StoreName $PstPath
+if (-not $store -and (Test-Path -LiteralPath $PstPath)) {
+  # 2 is Outlook OlStoreType.olStoreUnicode.
+  $ns.AddStoreEx($PstPath, 2)
+  $pstAutoMounted = $true
+  Start-Sleep -Milliseconds 500
+  $store = Get-OutlookStore $ns $StoreName $PstPath
+}
+
 if (-not $store) {
-  throw "Outlook store not found: $StoreName"
+  if (Test-Path -LiteralPath $PstPath) {
+    throw "Outlook store not found after PST mount attempt: $StoreName at $PstPath"
+  }
+  throw "Outlook store not found and PST path does not exist: $StoreName at $PstPath"
 }
 
 function Find-Folder($folder, [string[]]$parts, [int]$idx) {
@@ -1384,14 +1415,22 @@ function Find-Folder($folder, [string[]]$parts, [int]$idx) {
   return $null
 }
 
+function Safe-Text([scriptblock]$block) {
+  try {
+    return [string](& $block)
+  } catch {
+    return ""
+  }
+}
+
 function Message-Record($item, $folderPath) {
   [PSCustomObject]@{
     folder = $folderPath
-    received = try { ([datetime]$item.ReceivedTime).ToString("s") } catch { "" }
-    sender = try { [string]$item.SenderName } catch { "" }
-    from = try { [string]$item.SenderEmailAddress } catch { "" }
-    subject = try { [string]$item.Subject } catch { "" }
-    body = try { [string]$item.Body } catch { "" }
+    received = Safe-Text { ([datetime]$item.ReceivedTime).ToString("s") }
+    sender = Safe-Text { $item.SenderName }
+    "from" = Safe-Text { $item.SenderEmailAddress }
+    subject = Safe-Text { $item.Subject }
+    body = Safe-Text { $item.Body }
     attachments = @()
   }
 }
@@ -1445,6 +1484,9 @@ for ($i = 1; $i -le $restricted.Count; $i++) {
 $payload = [PSCustomObject]@{
   service_date = $service.ToString("yyyy-MM-dd")
   subject_marker = $subjectMarker
+  store_name = $StoreName
+  pst_path = $PstPath
+  pst_auto_mounted = $pstAutoMounted
   output_dir = (Resolve-Path $outputDir).Path
   source_messages = $sourceMessages
   music_messages = $musicMessages
@@ -1473,12 +1515,12 @@ Run:
 powershell -ExecutionPolicy Bypass -File tools\export_weekly_sources.ps1 -ServiceDate 2026-05-17
 ```
 
-Expected: prints a `tmp\weekly_review_sources\2026-05-17\sources.json` path.
+Expected: prints a `tmp\weekly_review_sources\2026-05-17\sources.json` path. If the `Adam Alderson` store was not already mounted, the helper mounts `C:\Users\kentu\AppData\Local\Microsoft\Outlook\Adam Alderson.pst` first and writes `"pst_auto_mounted": true` in `sources.json`.
 
 Inspect:
 
 ```powershell
-Get-Content tmp\weekly_review_sources\2026-05-17\sources.json | Select-String -Pattern "May 17 worship notes","Ascension Sunday 1030am.docx","Music for Sunday","Bulletin"
+Get-Content tmp\weekly_review_sources\2026-05-17\sources.json | Select-String -Pattern "Adam Alderson","pst_auto_mounted","May 17 worship notes","Ascension Sunday 1030am.docx","Music for Sunday","Bulletin"
 ```
 
 Expected: output includes those strings.
@@ -1701,6 +1743,6 @@ If no fixes were needed, do not create an empty commit.
 
 ## Self-Review Checklist
 
-- Spec coverage: Tasks cover reusable Codex skill creation, review JSON helpers, GUI review mode, backend endpoints, source export, skill-backed automation prompt, and verification.
+- Spec coverage: Tasks cover reusable Codex skill creation, review JSON helpers, GUI review mode, backend endpoints, Outlook source export with PST auto-mount fallback, skill-backed automation prompt, and verification.
 - Placeholder scan: This plan intentionally avoids placeholder phrases and gives exact files, commands, snippets, and expected results.
 - Type consistency: Review metadata uses `_review`; server payload uses `WeeklyReviewPayload`; review helpers use `REVIEW_META_KEY`; generated documents receive `_review`-stripped data.
