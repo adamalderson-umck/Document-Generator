@@ -119,21 +119,25 @@ Generation from a review file should reuse existing validation behavior where us
 - call `generate_word_docs()`
 - report generated file paths in the GUI status log
 
+## Reusable Codex Skill
+
+The recurring workflow should live in a reusable Codex skill named `weekly-document-review`. The skill is the durable "how to prepare the weekly packet" layer; the cron automation is only the calendar trigger.
+
+The skill should live in the user's Codex skill directory, such as `C:\Users\kentu\.codex\skills\weekly-document-review`, so future Codex runs can discover it. It should include:
+
+- `SKILL.md` with the core workflow and trigger description
+- `references/source-selection.md` for Outlook store, folder, subject, date-window, and attachment-selection rules
+- `references/review-json.md` for the review JSON shape, field coverage rules, `_review` metadata, and attention-field policy
+
+The skill should not duplicate project-owned source-of-truth files. It should read this repository's `CONTEXT.md` for music terminology and use repository helpers such as `tools/export_weekly_sources.ps1`, `weekly_review.py`, and template-variable discovery when available.
+
 ## Automation Behavior
 
 The recurring Codex automation should run Friday mornings and write the review packet only. It should not generate final documents.
 
-The prompt for the automation should be self-contained:
+The automation prompt should be intentionally small: invoke the `weekly-document-review` skill for `E:\Coding Projects\Document-Generator`, target the upcoming Sunday in `America/New_York`, write `inputs/weekly_reviews/YYYY-MM-DD-review.json`, and do not generate final documents.
 
-- workspace path
-- PST/store name and relevant folders
-- target date rule: upcoming Sunday
-- source-doc search rule: Nathan folder subject `[Month] [DD] worship notes`
-- source attachment rule: `10:30` `.docx`
-- music email rule: `Inbox\Music`, week preceding service
-- output path rule: `inputs/weekly_reviews/YYYY-MM-DD-review.json`
-- terminology rule: use `CONTEXT.md`
-- schema rule: include canonical worship-order fields, canonical music fields, current template variables, and `_review`
+Detailed source-selection, extraction, JSON-shape, and review-policy rules belong in the skill, not in the cron prompt.
 
 The automation should record enough source metadata in `_review.sources` to make the extraction auditable without dumping unnecessary full email bodies into the review file.
 
@@ -152,6 +156,7 @@ Implementation should include tests for:
 - attention-field classification
 - generation from a review JSON
 - fallback behavior when source email or attachment is missing
+- skill validation with the Codex skill validation script
 
 Manual verification should include the known May 17, 2026 sample:
 

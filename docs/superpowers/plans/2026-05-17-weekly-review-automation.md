@@ -4,7 +4,7 @@
 
 **Goal:** Build an automation-first weekly review workflow where Codex prepares `inputs/weekly_reviews/YYYY-MM-DD-review.json` with all previously supported worship-order and music fields plus current template variables, the GUI opens that review, and the user edits attention fields before generating documents.
 
-**Architecture:** Add a focused `weekly_review.py` module for review-file paths, validation, attention-field metadata, and generator-data conversion. Extend `server.py` with review JSON endpoints that reuse the existing `generate_word_docs()` path. Update the GUI to prefer the latest weekly review while preserving the current manual upload/paste workflow as a fallback.
+**Architecture:** Add a reusable Codex skill named `weekly-document-review` to hold the recurring workflow rules, with the cron automation reduced to a small scheduler prompt. Add a focused `weekly_review.py` module for review-file paths, validation, attention-field metadata, and generator-data conversion. Extend `server.py` with review JSON endpoints that reuse the existing `generate_word_docs()` path. Update the GUI to prefer the latest weekly review while preserving the current manual upload/paste workflow as a fallback.
 
 **Tech Stack:** Python 3, FastAPI, Pydantic, `docxtpl`, `python-docx`, vanilla JavaScript, PowerShell Outlook COM for the local source-export helper, Codex cron automation.
 
@@ -12,6 +12,9 @@
 
 ## File Structure
 
+- Create `C:\Users\kentu\.codex\skills\weekly-document-review\SKILL.md`: reusable Codex skill that owns the weekly review workflow.
+- Create `C:\Users\kentu\.codex\skills\weekly-document-review\references\source-selection.md`: Outlook source-selection rules.
+- Create `C:\Users\kentu\.codex\skills\weekly-document-review\references\review-json.md`: review JSON field coverage and `_review` rules.
 - Create `weekly_review.py`: pure Python helpers for weekly review directories, safe filenames, latest review lookup, load/save, canonical worship/music review fields, attention-field normalization, stripping `_review`, applying hymn-number formatting, and review-field initialization.
 - Create `tests/test_weekly_review.py`: unit tests for the helper module.
 - Modify `server.py`: add weekly-review paths, Pydantic payloads, endpoints for list/latest/load/save/generate, and a reusable generation helper.
@@ -20,7 +23,205 @@
 - Modify `static/script.js`: load latest review on startup, render attention/all-field editors, save review edits, generate from review JSON, and preserve manual workflow behavior.
 - Modify `static/style.css`: add restrained review-mode styles using existing visual vocabulary.
 - Create `tools/export_weekly_sources.ps1`: optional deterministic Outlook source export helper for the Codex automation to call before extraction.
-- Create `docs/automation/weekly-review-prompt.md`: stored prompt for the Codex cron automation.
+- Create `docs/automation/weekly-review-prompt.md`: thin stored prompt that invokes the `weekly-document-review` skill from the Codex cron automation.
+
+## Task 0: Weekly Document Review Skill
+
+**Files:**
+- Create: `C:\Users\kentu\.codex\skills\weekly-document-review\SKILL.md`
+- Create: `C:\Users\kentu\.codex\skills\weekly-document-review\references\source-selection.md`
+- Create: `C:\Users\kentu\.codex\skills\weekly-document-review\references\review-json.md`
+- Create: `C:\Users\kentu\.codex\skills\weekly-document-review\agents\openai.yaml`
+
+- [ ] **Step 1: Initialize the skill directory**
+
+Run:
+
+```powershell
+python C:\Users\kentu\.codex\skills\.system\skill-creator\scripts\init_skill.py weekly-document-review --path C:\Users\kentu\.codex\skills --resources references --interface display_name="Weekly Document Review" --interface short_description="Prepare weekly church document review JSON from Outlook and worship notes" --interface default_prompt="Prepare the weekly document review JSON for the upcoming Sunday."
+```
+
+Expected: creates `C:\Users\kentu\.codex\skills\weekly-document-review`.
+
+- [ ] **Step 2: Write the skill body**
+
+Replace `C:\Users\kentu\.codex\skills\weekly-document-review\SKILL.md` with:
+
+```markdown
+---
+name: weekly-document-review
+description: Prepare weekly church document review JSON packets for Document Generator. Use when Codex needs to extract worship-order and music fields from the local Outlook PST, worship-notes attachments, or weekly church planning emails, write `inputs/weekly_reviews/YYYY-MM-DD-review.json`, or run the Friday weekly document review automation.
+---
+
+# Weekly Document Review
+
+## Workflow
+
+1. Work in `E:\Coding Projects\Document-Generator` unless the user gives a different workspace.
+2. Determine the target service date as the upcoming Sunday in `America/New_York`.
+3. Read `CONTEXT.md` for current music terminology before extracting music fields.
+4. Read `references/source-selection.md` for Outlook folders, subject matching, date windows, and attachment rules.
+5. Export source material with `tools/export_weekly_sources.ps1` when available.
+6. Discover current template variables from `docx_templates/`.
+7. Build the review field set from canonical worship-order fields, canonical music fields, and current template variables.
+8. Extract worship-order fields from the selected `10:30` worship-notes `.docx`.
+9. Extract music fields from the week-before-service music emails.
+10. Read `references/review-json.md` for the required output shape and attention-field rules.
+11. Write `inputs/weekly_reviews/YYYY-MM-DD-review.json`.
+12. Do not generate final documents unless the user explicitly asks.
+
+## Guardrails
+
+- Keep `CONTEXT.md` as the source of truth for music language; do not copy its detailed terminology into this skill.
+- Use `*_details` only for secondary composer, arranger, harmonizer, editor, or additional-composer credit when `*_composer` has a primary credit.
+- Leave normally absent fields blank.
+- Record source metadata in `_review.sources`; do not include full email bodies in the final review JSON.
+- If required sources are missing, still write a review JSON with blank fields and `_review.status` set to `source_missing`.
+```
+
+- [ ] **Step 3: Write source-selection reference**
+
+Replace `C:\Users\kentu\.codex\skills\weekly-document-review\references\source-selection.md` with:
+
+````markdown
+# Source Selection
+
+## Outlook Store
+
+Use the local Outlook PST store named `Adam Alderson`.
+
+## Source Worship Notes
+
+- Folder: `Inbox\Staff\Nathan`
+- Subject marker: `[Month] [D] worship notes`, for example `May 24 worship notes`
+- Do not constrain worship-notes email search to the week before the service; these emails can arrive earlier.
+- Select the `10:30` `.docx` attachment.
+- If no matching Nathan email or `10:30` attachment exists, fall back to the newest plausible `.docx` in `inputs/` and record the fallback in `_review`.
+
+## Music Emails
+
+- Folder: `Inbox\Music`
+- Date window: the week preceding the service date through the service date.
+- Use the newest clarifying messages when later messages correct or complete earlier music information.
+
+## Export Helper
+
+When available, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\export_weekly_sources.ps1 -ServiceDate YYYY-MM-DD
+```
+
+Read the emitted `sources.json` and saved attachment paths.
+````
+
+- [ ] **Step 4: Write review JSON reference**
+
+Replace `C:\Users\kentu\.codex\skills\weekly-document-review\references\review-json.md` with:
+
+````markdown
+# Review JSON
+
+## Output Path
+
+Write the review packet to:
+
+```text
+inputs/weekly_reviews/YYYY-MM-DD-review.json
+```
+
+Use the target service date in the filename.
+
+## Field Coverage
+
+Top-level keys are the union of:
+
+- canonical worship-order fields from the source-document extraction channel
+- canonical music fields from organist and choir extraction channels
+- any additional variables used by the current templates
+- `_review`
+
+Canonical worship-order fields:
+
+```text
+date
+service_time
+sunday_title
+special_title
+is_communion_sunday
+hymn_1_num
+hymn_1_title
+hymn_1_instr
+hymn_2_num
+hymn_2_title
+hymn_2_instr
+hymn_3_num
+hymn_3_title
+hymn_3_instr
+communion_hymn_num
+communion_hymn_title
+doxology_num
+reading_1_verse
+reading_1_translation
+reading_2_verse
+reading_2_translation
+```
+
+Canonical music fields are each section with `title`, `composer`, `details`, and `personnel`:
+
+```text
+prelude
+offertory
+communion_piece
+postlude
+exit_music
+introit
+anthem
+prayer_response
+benediction_response
+```
+
+## Metadata
+
+Include `_review` with:
+
+```json
+{
+  "target_service_date": "YYYY-MM-DD",
+  "status": "needs_review",
+  "sources": [],
+  "attention_fields": [],
+  "missing_usual_fields": [],
+  "low_confidence_fields": [],
+  "conflicts": [],
+  "notes": []
+}
+```
+
+Use `_review.status = "source_missing"` when required source material is missing.
+
+## Attention Fields
+
+Add attention fields for:
+
+- conflicting evidence
+- low-confidence extraction
+- source-selection problems
+- structurally odd values, such as title without number
+- usually-present blank fields
+
+Blank normally-optional fields should not block generation.
+````
+
+- [ ] **Step 5: Validate the skill**
+
+Run:
+
+```powershell
+python C:\Users\kentu\.codex\skills\.system\skill-creator\scripts\quick_validate.py C:\Users\kentu\.codex\skills\weekly-document-review
+```
+
+Expected: validation passes.
 
 ## Task 1: Weekly Review Core Module
 
@@ -1289,7 +1490,7 @@ git add tools/export_weekly_sources.ps1
 git commit -m "Add Outlook weekly source export helper"
 ```
 
-## Task 7: Stored Automation Prompt And Codex Automation
+## Task 7: Skill-Backed Automation Prompt And Codex Automation
 
 **Files:**
 - Create: `docs/automation/weekly-review-prompt.md`
@@ -1301,34 +1502,13 @@ Create `docs/automation/weekly-review-prompt.md`:
 ```markdown
 # Weekly Review Automation Prompt
 
-You are running in `E:\Coding Projects\Document-Generator`.
+Use the `weekly-document-review` skill to prepare the weekly review JSON for the upcoming Sunday service.
 
-Goal: prepare the weekly review JSON for the upcoming Sunday service. Do not generate final documents.
+Workspace: `E:\Coding Projects\Document-Generator`
+Timezone: `America/New_York`
+Output: `inputs/weekly_reviews/YYYY-MM-DD-review.json`
 
-Steps:
-
-1. Determine the upcoming Sunday from the current run date in America/New_York.
-2. Run `powershell -ExecutionPolicy Bypass -File tools\export_weekly_sources.ps1 -ServiceDate YYYY-MM-DD`.
-3. Read the generated `sources.json`.
-4. Read `CONTEXT.md` for music terminology.
-5. Discover current template variables from `docx_templates/` using the repository helpers when possible.
-6. Extract source-document fields from the selected `10:30` worship-notes `.docx`.
-7. Extract music fields from the `Inbox\Music` messages in `sources.json`.
-8. Produce a review object containing canonical worship-order fields, canonical music fields, any additional current template variables, and `_review`.
-9. Write it to `inputs/weekly_reviews/YYYY-MM-DD-review.json`.
-
-Rules:
-
-- Use the source worship notes email from `Inbox\Staff\Nathan` with subject marker `[Month] [D] worship notes`.
-- Use the `10:30` `.docx` attachment when available.
-- Use music emails from the week preceding the service.
-- Include all previously supported worship-order fields and all grand music fields even when a field is not used by the current templates.
-- Do not put composer-like text in `*_details` when `*_composer` is blank.
-- Use `*_details` only for secondary composer, arranger, harmonizer, editor, or additional-composer credit.
-- Leave normally absent fields blank.
-- Add `_review.attention_fields` for conflicts, low-confidence values, source-selection problems, and usually-present blank fields.
-- Record source metadata in `_review.sources` without copying full email bodies into the final review JSON.
-- If required sources are missing, still write a review JSON with blank fields and `_review.status` set to `source_missing`.
+Do not generate final documents. The GUI review step handles generation.
 ```
 
 - [ ] **Step 2: Commit the prompt file**
@@ -1347,7 +1527,7 @@ Use the Codex automation tool with:
 - `cwds`: `E:\Coding Projects\Document-Generator`
 - `executionEnvironment`: `local`
 - `rrule`: `FREQ=WEEKLY;BYDAY=FR;BYHOUR=8;BYMINUTE=0;BYSECOND=0`
-- `prompt`: the contents of `docs/automation/weekly-review-prompt.md`
+- `prompt`: the contents of `docs/automation/weekly-review-prompt.md`; this prompt intentionally delegates detailed workflow rules to the `weekly-document-review` skill
 - `status`: `ACTIVE`
 
 Expected: the automation is saved and scheduled for Friday mornings at 8:00 AM Eastern on the local workspace.
@@ -1357,7 +1537,17 @@ Expected: the automation is saved and scheduled for Friday mornings at 8:00 AM E
 **Files:**
 - No code changes expected unless verification exposes a defect.
 
-- [ ] **Step 1: Run the full Python test suite**
+- [ ] **Step 1: Validate the Codex skill**
+
+Run:
+
+```powershell
+python C:\Users\kentu\.codex\skills\.system\skill-creator\scripts\quick_validate.py C:\Users\kentu\.codex\skills\weekly-document-review
+```
+
+Expected: validation passes.
+
+- [ ] **Step 2: Run the full Python test suite**
 
 Run:
 
@@ -1367,7 +1557,7 @@ Run:
 
 Expected: all tests pass.
 
-- [ ] **Step 2: Run the May 17 source export**
+- [ ] **Step 3: Run the May 17 source export**
 
 Run:
 
@@ -1377,7 +1567,7 @@ powershell -ExecutionPolicy Bypass -File tools\export_weekly_sources.ps1 -Servic
 
 Expected: creates `tmp\weekly_review_sources\2026-05-17\sources.json` and saves `Ascension Sunday 1030am.docx`.
 
-- [ ] **Step 3: Create a May 17 review JSON fixture**
+- [ ] **Step 4: Create a May 17 review JSON fixture**
 
 Run this command to create a review JSON from the known May 17 source document plus the previously verified music extraction:
 
@@ -1465,7 +1655,7 @@ print(json.dumps({"path": "inputs/weekly_reviews/2026-05-17-review.json", "field
 
 Expected: prints a JSON object with `"path": "inputs/weekly_reviews/2026-05-17-review.json"` and a positive field count.
 
-- [ ] **Step 4: Start the local app**
+- [ ] **Step 5: Start the local app**
 
 Run:
 
@@ -1475,7 +1665,7 @@ Run:
 
 Expected: server starts on `http://127.0.0.1:8000`.
 
-- [ ] **Step 5: Verify review mode in the GUI**
+- [ ] **Step 6: Verify review mode in the GUI**
 
 Open `http://127.0.0.1:8000`.
 
@@ -1487,7 +1677,7 @@ Expected:
 - all-fields panel expands
 - Manual Mode reveals the old workflow
 
-- [ ] **Step 6: Generate documents from review mode**
+- [ ] **Step 7: Generate documents from review mode**
 
 Click Generate Final Documents.
 
@@ -1498,7 +1688,7 @@ Expected:
 - blank optional fields do not block generation
 - server response includes any informational `missing_fields`
 
-- [ ] **Step 7: Commit verification fixes if needed**
+- [ ] **Step 8: Commit verification fixes if needed**
 
 If verification required code fixes, commit only those fixes:
 
@@ -1511,6 +1701,6 @@ If no fixes were needed, do not create an empty commit.
 
 ## Self-Review Checklist
 
-- Spec coverage: Tasks cover review JSON helpers, GUI review mode, backend endpoints, source export, automation prompt, and verification.
+- Spec coverage: Tasks cover reusable Codex skill creation, review JSON helpers, GUI review mode, backend endpoints, source export, skill-backed automation prompt, and verification.
 - Placeholder scan: This plan intentionally avoids placeholder phrases and gives exact files, commands, snippets, and expected results.
 - Type consistency: Review metadata uses `_review`; server payload uses `WeeklyReviewPayload`; review helpers use `REVIEW_META_KEY`; generated documents receive `_review`-stripped data.
