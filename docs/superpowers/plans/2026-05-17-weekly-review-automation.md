@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build an automation-first weekly review workflow where Codex prepares `inputs/weekly_reviews/YYYY-MM-DD-review.json`, the GUI opens that review, and the user edits attention fields before generating documents.
+**Goal:** Build an automation-first weekly review workflow where Codex prepares `inputs/weekly_reviews/YYYY-MM-DD-review.json` with all previously supported worship-order and music fields plus current template variables, the GUI opens that review, and the user edits attention fields before generating documents.
 
 **Architecture:** Add a focused `weekly_review.py` module for review-file paths, validation, attention-field metadata, and generator-data conversion. Extend `server.py` with review JSON endpoints that reuse the existing `generate_word_docs()` path. Update the GUI to prefer the latest weekly review while preserving the current manual upload/paste workflow as a fallback.
 
@@ -12,7 +12,7 @@
 
 ## File Structure
 
-- Create `weekly_review.py`: pure Python helpers for weekly review directories, safe filenames, latest review lookup, load/save, attention-field normalization, stripping `_review`, applying hymn-number formatting, and template-field initialization.
+- Create `weekly_review.py`: pure Python helpers for weekly review directories, safe filenames, latest review lookup, load/save, canonical worship/music review fields, attention-field normalization, stripping `_review`, applying hymn-number formatting, and review-field initialization.
 - Create `tests/test_weekly_review.py`: unit tests for the helper module.
 - Modify `server.py`: add weekly-review paths, Pydantic payloads, endpoints for list/latest/load/save/generate, and a reusable generation helper.
 - Modify `tests/test_server_validation.py`: endpoint-level tests for review generation and persistence.
@@ -210,29 +210,42 @@ git commit -m "Add weekly review file helpers"
 - Modify: `weekly_review.py`
 - Modify: `tests/test_weekly_review.py`
 
-- [ ] **Step 1: Add failing tests for template-field initialization and attention fields**
+- [ ] **Step 1: Add failing tests for canonical review fields and attention fields**
 
 Append to `tests/test_weekly_review.py`:
 
 ```python
 from weekly_review import (
+    CANONICAL_REVIEW_FIELDS,
     USUAL_FIELDS,
     attention_items,
     initialize_review,
 )
 
 
-def test_initialize_review_includes_template_fields_and_review_metadata():
+def test_canonical_review_fields_include_all_previous_extraction_channels():
+    assert "service_time" in CANONICAL_REVIEW_FIELDS
+    assert "special_title" in CANONICAL_REVIEW_FIELDS
+    assert "communion_hymn_num" in CANONICAL_REVIEW_FIELDS
+    assert "prelude_details" in CANONICAL_REVIEW_FIELDS
+    assert "offertory_personnel" in CANONICAL_REVIEW_FIELDS
+    assert "benediction_response_personnel" in CANONICAL_REVIEW_FIELDS
+
+
+def test_initialize_review_includes_canonical_fields_template_fields_and_review_metadata():
     review = initialize_review(
-        template_fields=["date", "hymn_1_num", "prelude_title"],
-        extracted_data={"date": "May 24, 2026", "prelude_title": "Prelude"},
+        template_fields=["custom_template_field"],
+        extracted_data={"date": "May 24, 2026", "custom_template_field": "Custom"},
         target_service_date="2026-05-24",
         sources=[{"kind": "source_doc", "subject": "May 24 worship notes"}],
     )
 
     assert review["date"] == "May 24, 2026"
+    assert review["service_time"] == ""
     assert review["hymn_1_num"] == ""
-    assert review["prelude_title"] == "Prelude"
+    assert review["prelude_details"] == ""
+    assert review["benediction_response_personnel"] == ""
+    assert review["custom_template_field"] == "Custom"
     assert review[REVIEW_META_KEY]["target_service_date"] == "2026-05-24"
     assert review[REVIEW_META_KEY]["sources"] == [
         {"kind": "source_doc", "subject": "May 24 worship notes"}
@@ -294,13 +307,59 @@ Run:
 .\.venv\Scripts\python.exe -m pytest tests/test_weekly_review.py -v
 ```
 
-Expected: fail because `initialize_review`, `attention_items`, and `USUAL_FIELDS` are not defined.
+Expected: fail because `initialize_review`, `attention_items`, `CANONICAL_REVIEW_FIELDS`, and `USUAL_FIELDS` are not defined.
 
 - [ ] **Step 3: Implement initialization and attention helpers**
 
 Add to `weekly_review.py`:
 
 ```python
+WORSHIP_ORDER_FIELDS = (
+    "date",
+    "service_time",
+    "sunday_title",
+    "special_title",
+    "is_communion_sunday",
+    "hymn_1_num",
+    "hymn_1_title",
+    "hymn_1_instr",
+    "hymn_2_num",
+    "hymn_2_title",
+    "hymn_2_instr",
+    "hymn_3_num",
+    "hymn_3_title",
+    "hymn_3_instr",
+    "communion_hymn_num",
+    "communion_hymn_title",
+    "doxology_num",
+    "reading_1_verse",
+    "reading_1_translation",
+    "reading_2_verse",
+    "reading_2_translation",
+)
+
+MUSIC_SECTIONS = (
+    "prelude",
+    "offertory",
+    "communion_piece",
+    "postlude",
+    "exit_music",
+    "introit",
+    "anthem",
+    "prayer_response",
+    "benediction_response",
+)
+
+MUSIC_FIELD_SUFFIXES = ("title", "composer", "details", "personnel")
+
+MUSIC_FIELDS = tuple(
+    f"{section}_{suffix}"
+    for section in MUSIC_SECTIONS
+    for suffix in MUSIC_FIELD_SUFFIXES
+)
+
+CANONICAL_REVIEW_FIELDS = WORSHIP_ORDER_FIELDS + MUSIC_FIELDS
+
 USUAL_FIELDS = {
     "date",
     "service_time",
@@ -321,6 +380,16 @@ USUAL_FIELDS = {
 }
 
 
+def review_fields_for_template_fields(template_fields):
+    canonical = list(CANONICAL_REVIEW_FIELDS)
+    seen = set(canonical)
+    for field in sorted(template_fields):
+        if field not in seen:
+            canonical.append(field)
+            seen.add(field)
+    return canonical
+
+
 def initialize_review(
     template_fields,
     extracted_data,
@@ -329,7 +398,7 @@ def initialize_review(
     notes=None,
 ):
     review = {}
-    for field in sorted(template_fields):
+    for field in review_fields_for_template_fields(template_fields):
         value = extracted_data.get(field, "")
         review[field] = value if value is not None else ""
     review[REVIEW_META_KEY] = {
@@ -1245,7 +1314,7 @@ Steps:
 5. Discover current template variables from `docx_templates/` using the repository helpers when possible.
 6. Extract source-document fields from the selected `10:30` worship-notes `.docx`.
 7. Extract music fields from the `Inbox\Music` messages in `sources.json`.
-8. Produce a review object containing all current template variables plus `_review`.
+8. Produce a review object containing canonical worship-order fields, canonical music fields, any additional current template variables, and `_review`.
 9. Write it to `inputs/weekly_reviews/YYYY-MM-DD-review.json`.
 
 Rules:
@@ -1253,6 +1322,7 @@ Rules:
 - Use the source worship notes email from `Inbox\Staff\Nathan` with subject marker `[Month] [D] worship notes`.
 - Use the `10:30` `.docx` attachment when available.
 - Use music emails from the week preceding the service.
+- Include all previously supported worship-order fields and all grand music fields even when a field is not used by the current templates.
 - Do not put composer-like text in `*_details` when `*_composer` is blank.
 - Use `*_details` only for secondary composer, arranger, harmonizer, editor, or additional-composer credit.
 - Leave normally absent fields blank.

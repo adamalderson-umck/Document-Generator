@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Document Generator should move from manual upload and pasted email parsing toward a weekly Codex-prepared review packet. The Friday automation will gather the same recurring church planning inputs the user already receives, extract the fields needed by the current templates, and leave a generator-ready JSON file for review in the GUI.
+Document Generator should move from manual upload and pasted email parsing toward a weekly Codex-prepared review packet. The Friday automation will gather the same recurring church planning inputs the user already receives, extract all previously supported worship-order and music fields plus any additional current template variables, and leave a generator-ready JSON file for review in the GUI.
 
 The goal is not full unattended document production. The goal is a reliable "prepare, review, generate" workflow where Codex handles extraction and the user keeps the final production click.
 
@@ -27,7 +27,7 @@ Every Friday morning, a Codex automation targets the upcoming Sunday.
 3. Find the source worship-notes email in `Inbox\Staff\Nathan` using the subject marker `[Month] [DD] worship notes`, such as `May 24 worship notes`.
 4. Select the `10:30` `.docx` attachment from that email.
 5. Search music emails in `Inbox\Music` for the week preceding the service date.
-6. Extract values for the variables used by the current templates.
+6. Extract values for the full review field set: canonical worship-order fields, canonical music fields, and any additional variables used by the current templates.
 7. Write a review JSON file to `inputs/weekly_reviews/YYYY-MM-DD-review.json`, where the date is the target service date.
 8. Leave final document generation to the GUI.
 
@@ -37,9 +37,14 @@ Special mid-week services are out of scope for the recurring automation. They re
 
 ## Review JSON Shape
 
-The review file should be directly usable by the generator. Top-level keys are the variables used by the current templates, plus a `_review` object.
+The review file should be directly usable by the generator. Top-level keys are the union of:
 
-Example shape:
+- canonical worship-order fields from the source-document extraction channel
+- canonical music fields from the organist and choir extraction channels
+- any additional variables used by the current templates
+- a `_review` object
+
+The sample below is intentionally abbreviated. It demonstrates the shape, not the full field list.
 
 ```json
 {
@@ -128,7 +133,7 @@ The prompt for the automation should be self-contained:
 - music email rule: `Inbox\Music`, week preceding service
 - output path rule: `inputs/weekly_reviews/YYYY-MM-DD-review.json`
 - terminology rule: use `CONTEXT.md`
-- schema rule: include current template variables plus `_review`
+- schema rule: include canonical worship-order fields, canonical music fields, current template variables, and `_review`
 
 The automation should record enough source metadata in `_review.sources` to make the extraction auditable without dumping unnecessary full email bodies into the review file.
 
@@ -153,7 +158,7 @@ Manual verification should include the known May 17, 2026 sample:
 - Nathan email subject `May 17 worship notes`
 - attachment `Ascension Sunday 1030am.docx`
 - music emails from the preceding week
-- output review JSON containing current template variables plus `_review`
+- output review JSON containing canonical worship-order fields, canonical music fields, current template variables, and `_review`
 
 ## Open Decisions
 
