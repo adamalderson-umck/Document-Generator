@@ -54,3 +54,17 @@ Before the first composition test: agree on a safe moment, verify refusal while 
 Task 3 requires a user-agreed safe moment before native application testing. First verify refusal when a user document is open, then test generated scratch files only with the relevant app available. Never open/switch/close a user's document. Until then, all three replay artifacts remain `proof_status: pending`.
 
 Remaining implementation includes native proof adapters, robust cross-output/editorial validation, three-service Google routing, bounded fit repair, finalization, jobs/recovery, skills and scheduling. The initial builders are not deployed and must not be used as unattended production automation yet.
+
+## Native replay checkpoint
+
+The user authorized a safe native test with both programs available. Initial PowerShell Core Marshal lookup was incompatible; explicit Windows PowerShell 5.1 successfully attached to Word. InDesign active-object lookup was unavailable; its registered `InDesign.Application.2026` COM activation reached the running application (version 21.6.0.57). Both reported zero open documents before composition.
+
+- Added manual proof scripts and a Python adapter contract with busy/failure/stale-result/visual-review tests. These are not a scheduled worker or a full deadline/recovery implementation.
+- `rev-001` native exports exposed technical-sheet tab collisions and vertically centered continuation pages. Regression tests were added before correcting the technical renderer.
+- `rev-002` contains the corrected editable files. Bulletin: four pages, zero overset, zero missing fonts and zero bad links. Camera: two pages. Sound: one page.
+- Inspected all seven rendered pages. Final bulletin page rasters are byte-identical to the initially inspected proof. Revised technical proofs have readable separators and top-aligned continuation, repeated table headers and no observed clipping or split rows. Cue review markers account for extra Camera row height.
+- Busy-application smoke tests created only task-owned temporary blank documents. Both native adapters returned `pending / user_documents_open`, produced no busy-test PDF, and left the guard documents open for their owning test to close. No user document was closed or saved.
+- Both applications reported zero open documents after normal export. No automatic PDF opening was requested. Foreground focus was not instrumented; background noninterference remains unverified pending user observation and a stronger focus test. Continue user-initiated proofing only.
+- Content is still a review draft: inherited dated copy, all unconfirmed cues, and Nathan/music structural disagreements remain findings. Layout inspection does not certify those fields.
+
+Next: confirm focus behavior and source/cue inputs, then proceed to the three-service milestone. No schedule has been enabled or replaced.

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from docx import Document
 from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 
 def render_technical(service, cues, templates, directory):
@@ -24,6 +25,12 @@ def render_technical(service, cues, templates, directory):
             raise ValueError('Technical template requires header, table header and prototype row')
         title = doc.paragraphs[0]
         title.text = f"{service['date']} {service['time']} Worship Order and {'Camera' if kind == 'cameras' else 'Sound'} Plot"
+        for section in doc.sections:
+            for old in section._sectPr.findall(qn('w:vAlign')):
+                section._sectPr.remove(old)
+            alignment = OxmlElement('w:vAlign')
+            alignment.set(qn('w:val'), 'top')
+            section._sectPr.append(alignment)
         table = doc.tables[0]
         expected = 5 if kind == 'cameras' else 2
         if len(table.columns) != expected:
@@ -41,6 +48,8 @@ def render_technical(service, cues, templates, directory):
             for cell in row.cells:
                 cell.text = ''
             text = item.get('display_wording') or item['source_wording']
+            text = '\n'.join(' — '.join(part.strip() for part in line.split('\t') if part.strip())
+                             for line in text.split('\n'))
             row.cells[0 if kind == 'cameras' else 1].text = text
             # Only explicit item assignments with provenance are eligible.
             assignment = cues.get(item['id'], {})

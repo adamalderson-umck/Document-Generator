@@ -54,3 +54,17 @@ def test_existing_output_is_not_overwritten(tmp_path):
     with pytest.raises(FileExistsError):
         render_technical(service, {}, paths, out)
     assert target.read_bytes() == b'user edits'
+
+
+def test_technical_spacing_does_not_reuse_bulletin_tabs(tmp_path):
+    from docx.oxml.ns import qn
+    service = {'key': 'main', 'time': '10:00', 'date': '2099-09-20', 'items': [
+        {'id': 'a', 'source_wording': 'Prelude', 'display_wording': 'Prelude\t“Music”\tComposer'}]}
+    out = tmp_path/'out'
+    out.mkdir()
+    result = render_technical(service, {}, templates(tmp_path), out)
+    for artifact in result:
+        doc = Document(artifact['path'])
+        column = 0 if artifact['kind'] == 'cameras' else 1
+        assert doc.tables[0].rows[1].cells[column].text == 'Prelude — “Music” — Composer'
+        assert doc.sections[0]._sectPr.find(qn('w:vAlign')).get(qn('w:val')) == 'top'
