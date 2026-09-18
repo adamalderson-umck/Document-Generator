@@ -68,3 +68,17 @@ The user authorized a safe native test with both programs available. Initial Pow
 - Content is still a review draft: inherited dated copy, all unconfirmed cues, and Nathan/music structural disagreements remain findings. Layout inspection does not certify those fields.
 
 Next: confirm focus behavior and source/cue inputs, then proceed to the three-service milestone. No schedule has been enabled or replaced.
+
+## Early-service sources received
+
+The user supplied `Feast of Creation 830am.docx` and `Feast of Creation 930am.docx`. Both were copied read-only into the local acceptance fixture directory and hash-verified, with provenance in `early-orders-manifest.json`. Their headers confirm September 6, 2026 and their respective times. No tables occur in either document.
+
+- 8:30 includes its own opening prayer and Communion sequence, no choir items, and Trinity Chimes before Postlude. Preserve this closing order rather than copying the main service.
+- 9:30 orders two opening songs, one song after the opening prayer, and a closing song after Communion. It does not contain the traditional prelude/offertory sequence.
+- A fresh read-only Google snapshot was saved as `google-music-snapshot.json`. September 6 section: `A Time`; `Everything's In Your Hands`; `So Will I (100 Billion X)` with catalog identifier 7084123; and the compound `Build My Life / Nothing I Hold Onto`. Preserve list order when matching the four song slots, retain the medley as one slot, and record this mapping as agent interpretation of the two sources.
+- Google planning scripture lists Genesis 2.4–25, while Nathan's actual orders list Genesis 1.1–2.3. Nathan remains authoritative; retain the disagreement as a review finding.
+- The user confirmed neither application stole focus during the manual native test. This is observed success for that test, not unattended runtime certification.
+
+Remaining replay dependency: the checked output/template/scratch folders contain no separately identified finalized August 30 IDML/INDD. The original labeled template contains August 30 copy but has not been explicitly designated as a finalized prior-week baseline. Ask the user to designate it for this historical acceptance replay or supply the finalized August 30 file. Do not silently substitute the September 6 final as its own previous-week baseline.
+
+Routine Camera/Sound cue assignments also remain unconfirmed; the user supplied files without answering that earlier convention question. Continue visible review markers until authorization is supplied.
