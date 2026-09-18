@@ -82,3 +82,21 @@ The user supplied `Feast of Creation 830am.docx` and `Feast of Creation 930am.do
 Remaining replay dependency: the checked output/template/scratch folders contain no separately identified finalized August 30 IDML/INDD. The original labeled template contains August 30 copy but has not been explicitly designated as a finalized prior-week baseline. Ask the user to designate it for this historical acceptance replay or supply the finalized August 30 file. Do not silently substitute the September 6 final as its own previous-week baseline.
 
 Routine Camera/Sound cue assignments also remain unconfirmed; the user supplied files without answering that earlier convention question. Continue visible review markers until authorization is supplied.
+
+## Three-service first replay
+
+The user designated the original template with August 30 information as the baseline for this historical test. Its hash and designation are saved locally. All three September 6 bulletins independently use that template; no production baseline pointer was changed.
+
+Five editable drafts were generated in `outputs/2026-09-06/rev-001/`. Native proofs are in `qa/native-001/`. All bulletins have four pages, zero overset, zero missing fonts and zero bad links. Camera and Sound each have two proof pages. All 16 pages were visually accounted for; identical inherited pages were verified through raster hashes. Unrelated IDML package members match the baseline byte-for-byte in all three drafts.
+
+This is not yet three-service layout acceptance. Visual review found missing thematic headings/inconsistent hymn and reading presentation, a Communion panel boundary needing refinement, and split Sound operator instructions. Those findings are saved in `visual-review.json`. Do not overwrite this revision while fixing them.
+
+Fresh music review found explicit organist scope: only Communion/postlude selections apply to 8:30; solo prelude/offertory selections are not established. Main prayer response is in Nathan's order but declared absent in the music email; preserve and flag that disagreement. Unconfirmed production cues remain visible. Source selection currently includes agent-prepared mappings; the reusable Google adapter and further automated acceptance tests remain to be implemented.
+
+## User corrections: headings and cue defaults
+
+The user explicitly approved existing Camera/Sound template assignments as standing defaults, with exceptions flagged. The maintained cue configuration now records those defaults by semantic cue key. A regression test verifies routine assignment and exception override behavior.
+
+September 6 `rev-002` contains three explicit `OOW Heading` paragraphs in each bulletin (verified in packaged XML). Both technical sheets use routine template cues; only solo introit, solo offertory and disputed choral response remain flagged. Their four proof pages were inspected; the pre-existing Sound instruction-block split remains a separate layout finding.
+
+InDesign had a document open during this run. All three revised bulletin proof operations correctly deferred without touching it. Their new heading layout is therefore structurally verified but not yet visually proofed. Prior revisions remain unchanged. The routine cue mapping is authorized; it does not authorize automatic organ/choir assignments to changed performers.

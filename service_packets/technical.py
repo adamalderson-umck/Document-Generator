@@ -52,12 +52,12 @@ def render_technical(service, cues, templates, directory):
                              for line in text.split('\n'))
             row.cells[0 if kind == 'cameras' else 1].text = text
             # Only explicit item assignments with provenance are eligible.
-            assignment = cues.get(item['id'], {})
+            assignment = cues.get(item['id'], cues.get('defaults', {}).get(item.get('cue_key'), {}))
             confirmed = bool(assignment.get('evidence') or assignment.get('convention_id'))
-            instructions = assignment.get(kind) if confirmed else None
+            instructions = assignment.get(kind) if confirmed and not item.get('cue_exception') else None
             indices = [1, 2, 3, 4] if kind == 'cameras' else [0]
             if instructions is None:
-                row.cells[indices[0]].text = 'REVIEW: cue not confirmed'
+                row.cells[indices[0]].text = 'REVIEW: ' + item.get('cue_exception', 'cue not confirmed')
                 findings.append({'code': 'cue_unknown', 'item_id': item['id']})
             else:
                 if len(instructions) != len(indices):

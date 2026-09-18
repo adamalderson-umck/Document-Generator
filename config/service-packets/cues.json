@@ -1,1 +1,281 @@
-{}
+{
+  "approval": "User authorized existing Camera/Sound template assignments as standing defaults; flag exceptions.",
+  "defaults": {
+    "welcome": {
+      "convention_id": "approved-template-welcome",
+      "cameras": [
+        "",
+        "Pulpit PiP",
+        "Lectern PiP",
+        "PiP"
+      ],
+      "sound": [
+        "Pulpit/Lectern"
+      ]
+    },
+    "organ_prelude": {
+      "convention_id": "approved-template-organ_prelude",
+      "cameras": [
+        "Organ",
+        "",
+        "",
+        ""
+      ],
+      "sound": [
+        "Organ"
+      ]
+    },
+    "introit": {
+      "convention_id": "approved-template-introit",
+      "cameras": [
+        "Choir",
+        "Choir Loft",
+        "",
+        "Lyrics"
+      ],
+      "sound": [
+        "Choir"
+      ]
+    },
+    "call_to_worship": {
+      "convention_id": "approved-template-call_to_worship",
+      "cameras": [
+        "Pulpit PiP",
+        "Pulpit PiP",
+        "",
+        "PiP"
+      ],
+      "sound": [
+        "Pulpit"
+      ]
+    },
+    "hymn": {
+      "convention_id": "approved-template-hymn",
+      "cameras": [
+        "Choir",
+        "Organ",
+        "Stained Glass",
+        "Lyrics"
+      ],
+      "sound": [
+        "Hymn"
+      ]
+    },
+    "children": {
+      "convention_id": "approved-template-children",
+      "cameras": [
+        "Pastor",
+        "Wide Shot",
+        "",
+        ""
+      ],
+      "sound": [
+        "Wireless"
+      ]
+    },
+    "first_reading": {
+      "convention_id": "approved-template-first_reading",
+      "cameras": [
+        "",
+        "",
+        "Lectern PiP",
+        "PiP"
+      ],
+      "sound": [
+        "Lectern"
+      ]
+    },
+    "anthem": {
+      "convention_id": "approved-template-anthem",
+      "cameras": [
+        "Choir",
+        "Choir Loft",
+        "",
+        "Lyrics"
+      ],
+      "sound": [
+        "Choir"
+      ]
+    },
+    "second_reading": {
+      "convention_id": "approved-template-second_reading",
+      "cameras": [
+        "",
+        "Pulpit PiP",
+        "",
+        "PiP"
+      ],
+      "sound": [
+        "Pulpit"
+      ]
+    },
+    "sermon": {
+      "convention_id": "approved-template-sermon",
+      "cameras": [
+        "Nathan",
+        "Pulpit PiP",
+        "",
+        "PiP"
+      ],
+      "sound": [
+        "Pulpit"
+      ]
+    },
+    "pastoral_prayer": {
+      "convention_id": "approved-template-pastoral_prayer",
+      "cameras": [
+        "Bob",
+        "",
+        "Lectern PiP",
+        "PiP"
+      ],
+      "sound": [
+        "Lectern"
+      ]
+    },
+    "choral_response": {
+      "convention_id": "approved-template-choral_response",
+      "cameras": [
+        "Choir",
+        "Choir Loft",
+        "",
+        "Lyrics"
+      ],
+      "sound": [
+        "Choir"
+      ]
+    },
+    "invitation": {
+      "convention_id": "approved-template-invitation",
+      "cameras": [
+        "Bob",
+        "",
+        "Lectern PiP",
+        "PiP"
+      ],
+      "sound": [
+        "Pulpit"
+      ]
+    },
+    "offertory": {
+      "convention_id": "approved-template-offertory",
+      "cameras": [
+        "Organ",
+        "Flowers",
+        "",
+        "Lyrics"
+      ],
+      "sound": [
+        "Organ"
+      ]
+    },
+    "communion": {
+      "convention_id": "approved-template-communion",
+      "cameras": [
+        "Nathan",
+        "Communion",
+        "",
+        "PiP"
+      ],
+      "sound": [
+        "Wireless"
+      ]
+    },
+    "communion_hymn": {
+      "convention_id": "approved-template-communion_hymn",
+      "cameras": [
+        "Choir",
+        "Organ",
+        "Stained Glass",
+        "Lyrics"
+      ],
+      "sound": [
+        "Hymn"
+      ]
+    },
+    "communion_organ": {
+      "convention_id": "approved-template-communion_organ",
+      "cameras": [
+        "Organ",
+        "",
+        "Stained Glass",
+        "Lyrics"
+      ],
+      "sound": [
+        "Organ"
+      ]
+    },
+    "communion_prayer": {
+      "convention_id": "approved-template-communion_prayer",
+      "cameras": [
+        "Nathan",
+        "Choir Loft",
+        "",
+        "PiP"
+      ],
+      "sound": [
+        "Wireless"
+      ]
+    },
+    "doxology": {
+      "convention_id": "approved-template-doxology",
+      "cameras": [
+        "Choir",
+        "Organ",
+        "Stained Glass",
+        "Lyrics"
+      ],
+      "sound": [
+        "Hymn"
+      ]
+    },
+    "thanksgiving_prayer": {
+      "convention_id": "approved-template-thanksgiving_prayer",
+      "cameras": [
+        "Nathan",
+        "Communion",
+        "",
+        "PiP"
+      ],
+      "sound": [
+        "Wireless"
+      ]
+    },
+    "benediction": {
+      "convention_id": "approved-template-benediction",
+      "cameras": [
+        "Nathan",
+        "Communion",
+        "",
+        "PiP"
+      ],
+      "sound": [
+        "Wireless"
+      ]
+    },
+    "postlude_chimes": {
+      "convention_id": "approved-template-postlude_chimes",
+      "cameras": [
+        "Organ",
+        "Choir Loft",
+        "Altar",
+        ""
+      ],
+      "sound": [
+        "Organ"
+      ]
+    },
+    "ending_loop": {
+      "convention_id": "approved-template-ending_loop",
+      "cameras": [
+        "",
+        "",
+        "",
+        ""
+      ],
+      "sound": [
+        "Mute All"
+      ]
+    }
+  }
+}

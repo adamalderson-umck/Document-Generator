@@ -68,3 +68,20 @@ def test_technical_spacing_does_not_reuse_bulletin_tabs(tmp_path):
         column = 0 if artifact['kind'] == 'cameras' else 1
         assert doc.tables[0].rows[1].cells[column].text == 'Prelude — “Music” — Composer'
         assert doc.sections[0]._sectPr.find(qn('w:vAlign')).get(qn('w:val')) == 'top'
+
+
+def test_standing_defaults_apply_except_for_explicit_exceptions(tmp_path):
+    service = {'key': 'main', 'time': '10:30', 'date': '2099-09-20', 'items': [
+        {'id': 'routine', 'source_wording': 'Prelude', 'cue_key': 'organ'},
+        {'id': 'special', 'source_wording': 'Solo offertory', 'cue_key': 'organ',
+         'cue_exception': 'Soloist replaces organ'}]}
+    cues = {'defaults': {'organ': {'convention_id': 'approved-template-organ',
+                                 'cameras': ['Organ', '', '', ''], 'sound': ['Organ']}}}
+    out = tmp_path/'out'
+    out.mkdir()
+    for result in render_technical(service, cues, templates(tmp_path), out):
+        doc = Document(result['path'])
+        cue_column = 1 if result['kind'] == 'cameras' else 0
+        assert doc.tables[0].rows[1].cells[cue_column].text == 'Organ'
+        assert 'Soloist replaces organ' in doc.tables[0].rows[2].cells[cue_column].text
+        assert [finding['item_id'] for finding in result['findings']] == ['special']
