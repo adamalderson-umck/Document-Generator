@@ -14,4 +14,10 @@ Requests carry an ID, allowlisted operation, absolute input/output/result paths 
 - A worker error or ambiguous launch likewise retains the lock. A process ID alone is insufficient to prove that a restarted process is the original worker.
 - Partial collection outputs and orphaned temporary records are diagnostic evidence. Do not silently treat them as a complete source snapshot or overwrite them on retry.
 
-Task registration and automated ownership reconciliation are not implemented yet. No Windows timer or Codex schedule is configured by these modules.
+## Registered on-demand entry point
+
+`Codex_ServicePacketDesktopWorker` is registered with no triggers, InteractiveToken logon, limited privileges, IgnoreNew instance policy and no Task Scheduler execution-time kill. Its sole spool is `C:/worktrees/Document-Generator/weekly-service-packet/state/service_packets/desktop`. The task executes `tools/service_packets/run_queued_job.ps1` using the existing repository Python environment. Retain this worktree and interpreter while the task references them; deployment relocation must update and reverify the task explicitly.
+
+An explicitly initiated dispatch writes an immutable input snapshot and an atomic `dispatch.json` request into that spool, then calls `Start-ScheduledTask -TaskName Codex_ServicePacketDesktopWorker`. Do not replace dispatch while a job/ownership lock is active. `service_packets.scheduled` validates cached completed results rather than launching them again. This is a low-level operator procedure; the automatic producer/agent skill is not deployed yet.
+
+Real acceptance through Windows Task Scheduler exported a one-page Camera proof with exit code 0; its pixels matched the previously inspected proof. Automated ownership reconciliation is not implemented. No recurring Windows timer or Codex schedule was added; the existing legacy weekly export task remains unchanged.
