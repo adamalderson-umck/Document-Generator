@@ -1,0 +1,98 @@
+"""Capture explicitly designated finals; promote only validated main bulletins."""
+
+from datetime import date
+from hashlib import sha256
+import json
+import os
+from pathlib import Path
+from uuid import uuid4
+import xml.etree.ElementTree as ET
+from zipfile import ZipFile
+
+from .idml import inspect_baseline
+from .model import ROLES
+
+
+def finalize_packet(root, designation, adapter=None):
+    state = Path(root)/'state/service_packets'
+    state.mkdir(parents=True, exist_ok=True)
+    lock = state/'finalize.lock'
+    with lock.open('x', encoding='utf-8') as stream:
+        stream.write(str(os.getpid()))
+    try:
+        return _capture(root, designation, adapter)
+    finally:
+        lock.unlink()
+
+
+def _capture(root, designation, adapter):
+    if not str(designation.get('user_designation', '')).strip():
+        raise ValueError('Explicit user designation is required')
+    day = date.fromisoformat(designation['date'])
+    if day.weekday() != 6:
+        raise ValueError('Final service date must be Sunday')
+    service = designation['service']
+    if service not in ROLES:
+        raise ValueError('Unknown service')
+    source = Path(designation['path']).resolve()
+    if source.suffix.lower() != '.idml':
+        return {'status': 'pending', 'reason': 'saved_idml_required', 'promoted': False}
+    state = Path(root)/'state/service_packets'
+    state.mkdir(parents=True, exist_ok=True)
+    pointer = state/'baseline.json'
+    if service == 'main' and pointer.exists():
+        previous = json.loads(pointer.read_text(encoding='utf-8'))
+        if str(day) < previous['date'] and not designation.get('exception_evidence'):
+            raise ValueError('Older final requires explicit exception evidence')
+    capture = state/'finals'/str(day)/service/uuid4().hex
+    capture.mkdir(parents=True)
+    content = source.read_bytes()
+    target = capture/'bulletin.idml'
+    with target.open('xb') as stream:
+        stream.write(content)
+    info = inspect_baseline(target)
+    with ZipFile(target) as archive:
+        for name in info['stories'].values():
+            story = ET.fromstring(archive.read(name))
+            if not ''.join(node.text or '' for node in story.iter('Content')).strip():
+                raise ValueError('Final labeled story is empty')
+            for paragraph in story.iter('ParagraphStyleRange'):
+                if paragraph.get('AppliedParagraphStyle') not in info['styles']:
+                    raise ValueError('Final story refers to an undefined paragraph style')
+    baseline = {'path': str(target.resolve()), 'sha256': info['sha256'],
+                'date': str(day), 'service': service, 'finalized': True,
+                'source_path': str(source), 'user_designation': designation['user_designation']}
+    if designation.get('exception_evidence'):
+        baseline['exception_evidence'] = designation['exception_evidence']
+    record = {'status': 'captured', 'baseline': baseline, 'promoted': service == 'main',
+              'outstanding': ['cameras', 'sound'] if service == 'main' else [],
+              'technical': {}}
+    if service == 'main':
+        from docx import Document
+        for kind in ('cameras', 'sound'):
+            supplied = designation.get('technical', {}).get(kind)
+            if not supplied:
+                continue
+            technical_source = Path(supplied).resolve()
+            technical_bytes = technical_source.read_bytes()
+            technical_target = capture/(kind+'.docx')
+            with technical_target.open('xb') as stream:
+                stream.write(technical_bytes)
+            Document(technical_target)  # Validate the captured package before promotion.
+            record['technical'][kind] = {'path': str(technical_target.resolve()),
+                                         'sha256': sha256(technical_bytes).hexdigest(),
+                                         'source_path': str(technical_source)}
+            record['outstanding'].remove(kind)
+    # The immutable capture records intent, not successful pointer replacement.
+    # Only baseline.json establishes which capture was actually promoted.
+    capture_record = {key: value for key, value in record.items() if key != 'promoted'}
+    capture_record['promotion_requested'] = service == 'main'
+    (capture/'record.json').write_text(json.dumps(capture_record, indent=2), encoding='utf-8')
+    if service == 'main':
+        temporary = state/('baseline-'+uuid4().hex+'.tmp')
+        with temporary.open('x', encoding='utf-8') as stream:
+            json.dump(baseline, stream, indent=2)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, state/'baseline.json')
+    return record

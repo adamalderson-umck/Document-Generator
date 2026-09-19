@@ -12,6 +12,15 @@ from .technical import render_technical
 
 def build_packet(packet, root, layout, cues, templates):
     packet = validate_packet(packet)
+    if 'baseline' not in packet:
+        pointer = Path(root)/'state/service_packets/baseline.json'
+        try:
+            packet['baseline'] = json.loads(pointer.read_text(encoding='utf-8'))
+        except FileNotFoundError:
+            packet['baseline'] = None
+        except (OSError, ValueError) as exc:
+            packet['baseline'] = None
+            packet['issues'].append({'code': 'baseline_unavailable', 'message': str(exc)})
     parent = Path(root)/'outputs'/packet['date']
     parent.mkdir(parents=True, exist_ok=True)
     for number in range(1, 10000):

@@ -115,3 +115,13 @@ The existing finalized September 6 main IDML was reused for September 13, a comb
 - Full suite: 68 passed, 1 skipped. Prior drafts and reference files remain untouched.
 
 This verifies the manual main-service continuity replay, not the complete finalization API, atomic baseline promotion, collection worker or scheduled execution. Those implementation tasks remain outstanding.
+
+## Saved-IDML finalization checkpoint
+
+Implemented the saved-IDML slice of Task 6. `finalize_packet` requires explicit designation, captures an immutable copy, validates labeled story content and paragraph-style references, and atomically promotes only main-service finals. Earlier dates require recorded exception evidence. Early/modern finals cannot replace the main pointer. Finalization uses an exclusive lock; an existing lock is never broken automatically. Supplied final Camera/Sound DOCX files are captured and validated; missing ones remain outstanding. Capture records describe promotion intent; the atomic baseline pointer is authoritative for successful promotion.
+
+Generation reads the saved pointer once when the packet omits an explicit baseline. It still checks the date and content hash, freezes the bytes once for all services, and leaves technical output available if the baseline is missing/stale/changed. An explicit `baseline: null` retains its existing meaning of no eligible baseline.
+
+The real September 6 final was promoted only within an isolated local acceptance root and used for the September 13 combined packet. Generated bulletin bytes exactly match the previously inspected `rev-003` bulletin. Synthetic three-service integration verifies all three bulletins consume the promoted baseline. Fault injection confirms failed pointer replacement preserves the prior pointer. Full suite: 81 passed, 1 skipped (unconfigured public-template identity check).
+
+Task 6 is not complete: direct saved-INDD export, deeper resource validation, build idempotency and shared weekly build locks remain outstanding. INDD finalization explicitly returns pending / saved_idml_required; it does not open or alter the user's document. No production pointer, Windows task or Codex schedule was activated.
