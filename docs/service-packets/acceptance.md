@@ -100,3 +100,18 @@ The user explicitly approved existing Camera/Sound template assignments as stand
 September 6 `rev-002` contains three explicit `OOW Heading` paragraphs in each bulletin (verified in packaged XML). Both technical sheets use routine template cues; only solo introit, solo offertory and disputed choral response remain flagged. Their four proof pages were inspected; the pre-existing Sound instruction-block split remains a separate layout finding.
 
 InDesign had a document open during this run. All three revised bulletin proof operations correctly deferred without touching it. Their new heading layout is therefore structurally verified but not yet visually proofed. Prior revisions remain unchanged. The routine cue mapping is authorized; it does not authorize automatic organ/choir assignments to changed performers.
+
+## September 19 policy clarification and continuity replay
+
+The user explicitly assigned text fit, overset and panel breaks to human cleanup. These findings must be reported, but do not block editable draft delivery or trigger automatic shrinking. This supersedes earlier layout-acceptance gates in this log and the implementation plan. Native proof failure remains distinct from a successful proof with cleanup notes.
+
+The existing finalized September 6 main IDML was reused for September 13, a combined 10:00 service. The existing cleaned September 13 IDML/PDF supplied the comparison reference; no new cleanup was requested from the user. No production baseline pointer was promoted.
+
+- Comparison exposed a renderer defect: the standing `Text Benediction` closing paragraph lived inside the replaced worship story and was dropped. A failing regression test reproduced it, then configured trailing-paragraph preservation fixed it without retaining old worship entries. The paragraph's original character formatting and overrides are preserved.
+- New outputs are in `outputs/2026-09-13/rev-003/`. Only the service-heading and worship-order story members differ from the frozen baseline; every other ZIP member is byte-identical.
+- Native proofs: bulletin four pages, Camera one page, Sound one page. Bulletin has zero overset, bad fonts or bad links. All six rendered pages were inspected; closing text is visible and technical rows and operator instructions fit. Only the two band items need cue review.
+- Nathan's source explicitly says Matthew 18.21-35; the cleaned reference says 18.21-33. The draft follows Nathan and records the difference. Prayer response, postlude and Trinity Chimes in the cleaned reference are absent from Nathan's supplied order; these are content-reconciliation findings, not layout failures. Some additional reference credits/performer labels are also absent from the interpreted source packet.
+- Inherited calendar, leaders, flowers and announcements deliberately remain the September 6 baseline copy for human updating. The reference's September 13 updates were not silently treated as input sources.
+- Full suite: 68 passed, 1 skipped. Prior drafts and reference files remain untouched.
+
+This verifies the manual main-service continuity replay, not the complete finalization API, atomic baseline promotion, collection worker or scheduled execution. Those implementation tasks remain outstanding.

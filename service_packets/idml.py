@@ -54,6 +54,14 @@ def render_idml(baseline, service, layout, target):
             root = ET.fromstring(archive.read(name))
             story = next(root.iter('Story'))
             old_paragraphs = list(story.findall('ParagraphStyleRange'))
+            retained_styles = {'ParagraphStyle/' + style for style in
+                               layout.get('retained_closing_styles', [])} if label == 'worship_order' else set()
+            closing = []
+            for paragraph in old_paragraphs:
+                if paragraph.get('AppliedParagraphStyle') in retained_styles:
+                    closing.append(paragraph)
+                elif closing:
+                    raise ValueError('Standing closing text must be a trailing paragraph block')
             for paragraph in old_paragraphs:
                 story.remove(paragraph)
             for line in service[field]:
@@ -69,6 +77,8 @@ def render_idml(baseline, service, layout, target):
                     ET.SubElement(run, 'Br')
                 if line.get('break_before'):
                     raise ValueError('Explicit panel break treatment requires a verified layout mapping')
+            for paragraph in closing:
+                story.append(paragraph)
             replacements[name] = ET.tostring(root, encoding='utf-8', xml_declaration=True)
         # Exclusive creation protects files the user may already be editing.
         with target.open('xb') as stream:

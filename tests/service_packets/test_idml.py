@@ -55,3 +55,25 @@ def test_unapproved_style_and_existing_destination_fail(tmp_path):
     with pytest.raises(FileExistsError):
         render_idml(original, service, {'allowed_styles': ['Body']}, target)
     assert target.read_bytes() == b'user edits'
+
+
+def test_retains_configured_standing_closing_text_and_formatting(tmp_path):
+    original = baseline(tmp_path/'base.idml')
+    closing = '<ParagraphStyleRange AppliedParagraphStyle="ParagraphStyle/Text Benediction" SpaceBefore="7"><CharacterStyleRange FontStyle="Italic"><Content>Our worship through service now begins.</Content><Br/></CharacterStyleRange></ParagraphStyleRange>'
+    with ZipFile(original) as archive:
+        members = {name: archive.read(name) for name in archive.namelist()}
+    story = 'Stories/Story_s1.xml'
+    members[story] = members[story].replace(b'</Story>', closing.encode() + b'</Story>')
+    with ZipFile(original, 'w') as archive:
+        for name, data in members.items():
+            archive.writestr(name, data)
+    target = tmp_path/'out.idml'
+    service = {'heading_paragraphs': [{'style': 'Body', 'text': 'New date'}],
+               'bulletin_paragraphs': [{'style': 'Body', 'text': 'New worship order'}]}
+    render_idml(original, service, {'allowed_styles': ['Body'],
+                'retained_closing_styles': ['Text Benediction']}, target)
+    with ZipFile(target) as archive:
+        root = ET.fromstring(archive.read(story))
+    assert [e.text for e in root.iter('Content')] == [
+        'New worship order', 'Our worship through service now begins.']
+    assert ET.tostring(root.find('.//Story')[-1]) == ET.tostring(ET.fromstring(closing))
