@@ -7,8 +7,32 @@ from pathlib import Path
 import sys
 import time
 
-from .jobs import accept_result, confined_path, run_job
+from .jobs import accept_result, confined_path, run_job, validate_job, atomic_record
 from .native import launch_desktop_job
+
+
+def queue_job(request, root):
+    root = Path(root).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    lock = root/'submission.lock'
+    with lock.open('x', encoding='utf-8') as stream:
+        stream.write(request['id'])
+    try:
+        if (root/'desktop.lock').exists():
+            raise FileExistsError('Desktop ownership remains active or unresolved')
+        dispatch = root/'dispatch.json'
+        if dispatch.exists():
+            previous = json.loads(dispatch.read_text(encoding='utf-8'))
+            result_path = confined_path(previous['result'], root)
+            if not result_path.exists():
+                raise FileExistsError('Previous dispatch has not completed')
+            result = accept_result(previous, json.loads(result_path.read_text(encoding='utf-8-sig')))
+            if result['status'] == 'failed':
+                raise FileExistsError('Failed dispatch requires reconciliation')
+        validate_job(request, root, datetime.now(timezone.utc))
+        atomic_record(dispatch, request)
+    finally:
+        lock.unlink()
 
 
 def run_queued_job(root, runner=None):
