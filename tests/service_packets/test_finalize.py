@@ -4,7 +4,7 @@ from zipfile import ZipFile
 
 import pytest
 
-from service_packets.finalize import finalize_packet
+from service_packets.finalize import finalize_packet, finalize_worker_export
 
 
 def final_idml(path):
@@ -194,3 +194,23 @@ def test_indd_export_uses_only_scratch_and_defers_when_busy(tmp_path, busy):
     if busy:
         assert result['reason'] == 'user_documents_open'
         assert not (tmp_path/'data/state/service_packets/baseline.json').exists()
+
+
+@pytest.mark.parametrize('bad_links', [0, 1])
+def test_registered_export_handoff_preserves_original_provenance(tmp_path, bad_links):
+    from hashlib import sha256
+    source=tmp_path/'final.indd'; source.write_bytes(b'approved original')
+    exported=final_idml(tmp_path/'export.idml')
+    request={'id':'export-1','operation':'export_final_idml','input_hash':sha256(source.read_bytes()).hexdigest(),
+             'output':str(exported)}
+    native={'id':'export-1','input_hash':request['input_hash'],'proof_status':'visual_review_pending',
+            'output_hash':sha256(exported.read_bytes()).hexdigest(),'bad_fonts':0,'bad_links':bad_links}
+    result={**{k:request[k] for k in ('id','operation','input_hash')},'status':'complete',
+            'output_hash':native['output_hash'],'native':native}
+    if bad_links:
+        with pytest.raises(ValueError): finalize_worker_export(tmp_path/'data',designation(source),request,result)
+        assert not (tmp_path/'data/state/service_packets/baseline.json').exists()
+    else:
+        record=finalize_worker_export(tmp_path/'data',designation(source),request,result)
+        assert record['baseline']['original_source']['path']==str(source.resolve())
+        assert record['baseline']['original_source']['sha256']==request['input_hash']

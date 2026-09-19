@@ -41,4 +41,20 @@ After building, read the actual IDML story XML and DOCX contents: verify every c
 
 Only an explicit final-file designation authorizes baseline promotion. Use `finalize_packet`; do not write baseline.json yourself. Finalization captures do not imply all technical finals are supplied.
 
+```python
+designation = {
+    'path': exact_user_designated_saved_file,
+    'date': target_sunday_iso,
+    'service': 'main',
+    'user_designation': actual_user_authorization,
+    'technical': supplied_final_docx_paths,  # e.g. {'cameras': path}; omit missing files
+}
+# Saved IDML:
+record = finalize_packet(data_root, designation)
+# Saved INDD, after a matching registered export_final_idml worker request/result:
+record = finalize_worker_export(data_root, designation, request, result)
+```
+
+For INDD, the request input is a saved-file snapshot inside the sole spool; designation.path remains the original user-designated INDD. `finalize_worker_export` validates the nested native result and original hash, then passes the exported IDML to finalization with original-source provenance. The older direct adapter's `format`/`sha256` envelope is not the registered worker's `operation`/`input_hash` envelope; never connect them by guessing field names. Pending export means no promotion. Missing resources prevent native promotion; fit findings do not. After promotion, verify baseline.json references the returned captured path/hash/service/date. Early capture leaves its previous bytes unchanged.
+
 No recurring workflow is activated yet. Before cutover: verify a complete ordinary three-service run from current connectors, scheduled Google access, user-approved timing, and explicit replacement of the old automation/export schedule. Preserve old settings for rollback. See `desktop-jobs.md` for ownership recovery; never clear a lock based on age.

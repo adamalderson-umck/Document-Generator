@@ -155,3 +155,11 @@ September 13 `rev-004` was built using the freshly collected Nathan attachment a
 Registered `Codex_ServicePacketDesktopWorker` as an on-demand, limited, interactive-user task. Exported task XML confirms no triggers, IgnoreNew and PT0S execution limit. A real scheduled-dispatch Camera proof returned exit code 0 and was pixel-identical to the inspected rev-004 Camera proof. A regression test ensures a completed dispatch is not launched twice. Exact spool/runtime paths and retention dependency are recorded in `desktop-jobs.md`.
 
 Full suite: 93 passed, 1 skipped. The existing `Codex_ExportWeeklyReviewSources` task remains untouched. The new task is on-demand only; no recurring Codex automation has been activated. The fresh combined-service replay is verified; scheduled Google access, agent skills/complete automated source interpretation, safe dispatch producer and cutover acceptance remain outstanding.
+
+## Agent skills checkpoint
+
+Preparation and finalization skills are now committed under `.agents/skills/`, with independent read-only subagent testing authorized by the user. Baseline and retest outcomes are recorded in `skill-validation.md`, including initially passing safety behavior and actual reproducibility failures. Maintained operations reference and private local runtime configuration identify the verified interpreter, source locations, templates, Google document and sole worker spool.
+
+Added `scheduled.queue_job` with exclusive producer ownership and refusal to replace unfinished dispatch. Added `finalize_worker_export` to validate registered export results and preserve original INDD provenance before finalization. A real registered export plus isolated finalization passed. No production baseline was promoted. Suite: 96 passed, 1 skipped.
+
+Interactive Google connector read succeeded for the designated 9:30 document. Scheduled Codex Google access remains unverified. Read-only automation inspection found legacy Codex preparation Thursday at 08:00 and Windows export Friday at 07:50; neither was changed. The replacement prompt is drafted in `docs/automation/service-packet-prompt.md`, not activated. Required next gates: timing/cutover authorization, production final designation, real ordinary three-service run using current connectors, and actual scheduled-runtime access acceptance.

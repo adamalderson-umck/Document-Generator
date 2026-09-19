@@ -13,3 +13,7 @@ Retest found Google selection detail had been lost when references were condense
 ## Finalization
 
 Independent baseline passed safety decisions but failed reproducibility: missing designation schema, worker/finalizer bridge, original INDD provenance and native-validation handoff. No finalization skill had yet been written. These gaps define the next skill test.
+
+Added the designation example, finalize skill and tested `finalize_worker_export` bridge. Independent retest passed the pressure scenario, early-service isolation, missing technical-final handling, pending-result truthfulness and cold-start recipe. Exact final finding: "No remaining scenario-blocking documentation failure found." Recovery remains an explicitly manual dependency.
+
+Main-session live acceptance used `queue_job` and the registered Windows task to export the existing cleaned September 13 INDD. The new bridge captured/promoted the export only in an isolated historical test root and retained original-file provenance. Production baseline.json remained absent. This verifies the bridge in the interactive scheduled Windows worker, not a scheduled Codex run or Google access in that runtime.

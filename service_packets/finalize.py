@@ -11,6 +11,29 @@ from zipfile import ZipFile
 
 from .idml import inspect_baseline
 from .model import ROLES
+from .jobs import accept_result
+
+
+def finalize_worker_export(root, designation, request, result):
+    """Validate a registered INDD export before promoting its captured IDML."""
+    if request.get('operation') != 'export_final_idml':
+        raise ValueError('Expected final-IDML export operation')
+    accepted = accept_result(request, result)
+    if accepted['status'] != 'complete':
+        return {'status': accepted['status'], 'reason': accepted.get('reason', 'export_incomplete'), 'promoted': False}
+    native = accepted.get('native', {})
+    if (native.get('id') != request['id'] or native.get('input_hash') != request['input_hash']
+            or native.get('proof_status') != 'visual_review_pending'
+            or native.get('output_hash') != accepted['output_hash']
+            or native.get('bad_fonts') != 0 or native.get('bad_links') != 0):
+        raise ValueError('Unverified native export or unavailable resources')
+    original = Path(designation['path']).resolve()
+    if original.suffix.lower() != '.indd' or sha256(original.read_bytes()).hexdigest() != request['input_hash']:
+        raise ValueError('Designated INDD differs from exported snapshot')
+    capture = dict(designation, path=request['output'], original_source={
+        'path': str(original), 'sha256': request['input_hash'], 'job_id': request['id'],
+        'native_export': native})
+    return finalize_packet(root, capture)
 
 
 def finalize_packet(root, designation, adapter=None):
@@ -87,6 +110,8 @@ def _capture(root, designation, adapter):
                 'source_path': str(source), 'user_designation': designation['user_designation']}
     if designation.get('exception_evidence'):
         baseline['exception_evidence'] = designation['exception_evidence']
+    if designation.get('original_source'):
+        baseline['original_source'] = designation['original_source']
     record = {'status': 'captured', 'baseline': baseline, 'promoted': service == 'main',
               'outstanding': ['cameras', 'sound'] if service == 'main' else [],
               'technical': {}}
