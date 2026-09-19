@@ -1,6 +1,6 @@
 """Capture explicitly designated finals; promote only validated main bulletins."""
 
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from hashlib import sha256
 import json
 import os
@@ -35,7 +35,10 @@ def _capture(root, designation, adapter):
     if service not in ROLES:
         raise ValueError('Unknown service')
     source = Path(designation['path']).resolve()
-    if source.suffix.lower() != '.idml':
+    suffix = source.suffix.lower()
+    if suffix not in {'.idml', '.indd'}:
+        raise ValueError('Final bulletin must be IDML or INDD')
+    if suffix == '.indd' and adapter is None:
         return {'status': 'pending', 'reason': 'saved_idml_required', 'promoted': False}
     state = Path(root)/'state/service_packets'
     state.mkdir(parents=True, exist_ok=True)
@@ -48,8 +51,28 @@ def _capture(root, designation, adapter):
     capture.mkdir(parents=True)
     content = source.read_bytes()
     target = capture/'bulletin.idml'
-    with target.open('xb') as stream:
-        stream.write(content)
+    native = None
+    if suffix == '.indd':
+        scratch = capture/'source.indd'
+        scratch.write_bytes(content)
+        request = {'id': uuid4().hex, 'format': 'indd', 'input': str(scratch.resolve()),
+                   'output': str(target.resolve()), 'result': str((capture/'export-result.json').resolve()),
+                   'sha256': sha256(content).hexdigest(),
+                   'deadline': (datetime.now(timezone.utc)+timedelta(minutes=15)).isoformat()}
+        native = adapter(request)
+        if native.get('id') != request['id'] or native.get('input_hash') != request['sha256']:
+            raise ValueError('Stale or mismatched native export result')
+        if native.get('proof_status') == 'pending':
+            return {'status': 'pending', 'reason': native.get('reason', 'native_export_pending'), 'promoted': False}
+        if native.get('proof_status') != 'visual_review_pending':
+            raise ValueError('Native export did not complete')
+        if native.get('bad_fonts') != 0 or native.get('bad_links') != 0:
+            raise ValueError('Final native export has unavailable fonts or links')
+        if native.get('output_hash') != sha256(target.read_bytes()).hexdigest():
+            raise ValueError('Native export output hash mismatch')
+    else:
+        with target.open('xb') as stream:
+            stream.write(content)
     info = inspect_baseline(target)
     with ZipFile(target) as archive:
         for name in info['stories'].values():
@@ -67,6 +90,8 @@ def _capture(root, designation, adapter):
     record = {'status': 'captured', 'baseline': baseline, 'promoted': service == 'main',
               'outstanding': ['cameras', 'sound'] if service == 'main' else [],
               'technical': {}}
+    if native is not None:
+        record['native_export'] = native
     if service == 'main':
         from docx import Document
         for kind in ('cameras', 'sound'):

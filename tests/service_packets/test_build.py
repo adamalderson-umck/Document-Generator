@@ -1,4 +1,5 @@
 from pathlib import Path
+import pytest
 
 from service_packets.build import build_packet
 
@@ -27,3 +28,8 @@ def test_missing_baseline_does_not_block_technical_outputs(tmp_path):
     assert any(i['code'] == 'baseline_missing' for i in first['issues'])
     assert all(Path(a['path']).is_file() for a in first['artifacts'])
     assert 'pending' in Path(first['review_path']).read_text()
+    lock = tmp_path/'data/state/service_packets/build-2099-09-20.lock'
+    lock.write_text('Other run still owns the week')
+    with pytest.raises(FileExistsError):
+        build_packet(packet, tmp_path/'data', {}, {}, templates)
+    assert lock.read_text() == 'Other run still owns the week'

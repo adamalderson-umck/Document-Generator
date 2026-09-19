@@ -146,6 +146,17 @@ def test_next_week_build_uses_promoted_baseline_for_all_three_services(tmp_path,
         assert any(issue['code'] == 'baseline_unavailable' for issue in result['issues'])
         return
     assert len(result['artifacts']) == 5
+    repeated = build_packet(packet, root, {'allowed_styles': ['OOW Body']}, {}, templates)
+    assert repeated['revision'] == result['revision']
+    assert repeated['reused'] is True
+    corrected = build_packet(packet, root, {'allowed_styles': ['OOW Body']}, {'rule_change': True}, templates)
+    assert corrected['revision'] != result['revision']
+    edited = Path(corrected['artifacts'][0]['path'])
+    edited.write_bytes(b'Human cleanup in progress')
+    regenerated = build_packet(packet, root, {'allowed_styles': ['OOW Body']}, {'rule_change': True}, templates)
+    assert regenerated['revision'] != corrected['revision']
+    assert edited.read_bytes() == b'Human cleanup in progress'
+    assert all(a['proof_status'] == 'pending' for a in repeated['artifacts'])
     saved = json.loads((Path(result['review_path']).parent/'service-packet.json').read_text())
     assert saved['baseline']['sha256'] == final['baseline']['sha256']
     for artifact in result['artifacts']:
@@ -161,3 +172,25 @@ def test_indd_is_deferred_without_touching_source_or_promoting(tmp_path):
     assert result == {'status': 'pending', 'reason': 'saved_idml_required', 'promoted': False}
     assert source.read_bytes() == b'User document'
     assert not (tmp_path/'data/state/service_packets/baseline.json').exists()
+
+
+@pytest.mark.parametrize('busy', [True, False])
+def test_indd_export_uses_only_scratch_and_defers_when_busy(tmp_path, busy):
+    from hashlib import sha256
+    source = tmp_path/'saved.indd'
+    source.write_bytes(b'Saved user document')
+    def adapter(request):
+        assert Path(request['input']) != source
+        assert Path(request['input']).read_bytes() == source.read_bytes()
+        result = {'id': request['id'], 'input_hash': request['sha256']}
+        if busy:
+            return dict(result, proof_status='pending', reason='user_documents_open')
+        exported = final_idml(Path(request['output']))
+        return dict(result, proof_status='visual_review_pending', bad_fonts=0, bad_links=0,
+                    output_hash=sha256(exported.read_bytes()).hexdigest())
+    result = finalize_packet(tmp_path/'data', designation(source), adapter)
+    assert result['promoted'] is (not busy)
+    assert source.read_bytes() == b'Saved user document'
+    if busy:
+        assert result['reason'] == 'user_documents_open'
+        assert not (tmp_path/'data/state/service_packets/baseline.json').exists()

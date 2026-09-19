@@ -3,6 +3,7 @@
 from datetime import date, timedelta
 from hashlib import sha256
 import json
+import os
 from pathlib import Path
 
 from .idml import render_idml
@@ -12,6 +13,25 @@ from .technical import render_technical
 
 def build_packet(packet, root, layout, cues, templates):
     packet = validate_packet(packet)
+    state = Path(root)/'state/service_packets'
+    state.mkdir(parents=True, exist_ok=True)
+    lock = state/('build-'+packet['date']+'.lock')
+    with lock.open('x', encoding='utf-8') as stream:
+        stream.write(str(os.getpid()))
+    try:
+        return _build_packet(packet, root, layout, cues, templates)
+    finally:
+        lock.unlink()
+
+
+def _file_identity(path):
+    try:
+        return sha256(Path(path).read_bytes()).hexdigest()
+    except OSError:
+        return 'unavailable'
+
+
+def _build_packet(packet, root, layout, cues, templates):
     if 'baseline' not in packet:
         pointer = Path(root)/'state/service_packets/baseline.json'
         try:
@@ -23,6 +43,29 @@ def build_packet(packet, root, layout, cues, templates):
             packet['issues'].append({'code': 'baseline_unavailable', 'message': str(exc)})
     parent = Path(root)/'outputs'/packet['date']
     parent.mkdir(parents=True, exist_ok=True)
+    dependencies = {str(path): _file_identity(path) for path in templates.values()}
+    for source in packet.get('sources', []):
+        if source.get('path'):
+            dependencies[source['path']] = _file_identity(source['path'])
+    if packet.get('baseline'):
+        dependencies[packet['baseline']['path']] = _file_identity(packet['baseline']['path'])
+    code = {path.name: _file_identity(path) for path in Path(__file__).parent.glob('*.py')}
+    identity = sha256(json.dumps({'packet': packet, 'layout': layout, 'cues': cues,
+                                 'dependencies': dependencies, 'renderer': code},
+                                sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
+    expected_count = len(packet['services']) + (2 if any(s['key'] == 'main' for s in packet['services']) else 0)
+    for manifest in sorted(parent.glob('rev-*/manifest.json'), reverse=True):
+        try:
+            previous = json.loads(manifest.read_text(encoding='utf-8'))
+            artifacts = previous['artifacts']
+            if previous.get('build_identity') == identity:
+                if (len(artifacts) == expected_count
+                        and all(_file_identity(a['path']) == a['sha256'] for a in artifacts)):
+                    previous['reused'] = True
+                    return previous  # Proof state is retained, never upgraded by reuse.
+                break  # Never fall back past a newer edited or incomplete handoff.
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
     for number in range(1, 10000):
         directory = parent/f'rev-{number:03d}'
         try:
@@ -33,6 +76,7 @@ def build_packet(packet, root, layout, cues, templates):
     else:
         raise RuntimeError('Revision allocation exhausted')
     result = {'date': packet['date'], 'revision': directory.name, 'artifacts': [],
+              'build_identity': identity, 'reused': False,
               'issues': packet['issues'], 'review_path': str(directory/'review.md')}
     baseline = packet.get('baseline')
     frozen = None

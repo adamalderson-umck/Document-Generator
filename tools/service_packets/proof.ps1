@@ -20,12 +20,13 @@ if ((Get-Item -LiteralPath $job.input).Attributes -band [IO.FileAttributes]::Rep
 if ((Get-FileHash -LiteralPath $job.input -Algorithm SHA256).Hash.ToLowerInvariant() -ne $job.sha256) { throw 'Input hash mismatch' }
 if ([DateTimeOffset]::UtcNow -gt [DateTimeOffset]::Parse($job.deadline)) { throw 'Proof deadline expired' }
 $result = @{id=$job.id; input_hash=$job.sha256; proof_status='pending'; format=$job.format}
-if ($job.format -eq 'idml') {
+if ($job.format -in @('idml', 'indd')) {
     $app = New-Object -ComObject InDesign.Application.2026
     if ($app.Documents.Count -ne 0) {
         $result.reason = 'user_documents_open'
     } else {
-        $script = 'var job = ' + ($job | ConvertTo-Json -Compress) + ';' + [Environment]::NewLine + (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'proof_indesign.jsx') -Raw)
+        $scriptName = if ($job.format -eq 'indd') { 'export_final_idml.jsx' } else { 'proof_indesign.jsx' }
+        $script = 'var job = ' + ($job | ConvertTo-Json -Compress) + ';' + [Environment]::NewLine + (Get-Content -LiteralPath (Join-Path $PSScriptRoot $scriptName) -Raw)
         $stats = $app.DoScript($script, 1246973031) | ConvertFrom-Json
         $result.pages = $stats.pages
         $result.overset = $stats.overset
