@@ -1,6 +1,6 @@
 # Desktop jobs: current manual contract
 
-This is an implementation checkpoint, not an enabled schedule.
+Desktop worker contract. Recurring preparation is controlled separately by the Codex automation; see operations.md and implementation-checklist.md for cutover status.
 
 Use one configured desktop spool root for every operation on the workstation. The registered runner internally calls `jobs.run_job` with the fixed launcher. Preparing/finalizing agents submit with `scheduled.queue_job` and start the registered task. Never dispatch arbitrary request-supplied commands or run separate spool roots concurrently. Earlier direct proof/finalization helpers are manual adapters, not parallel worker entry points.
 
@@ -9,6 +9,7 @@ Requests carry an ID, allowlisted operation, absolute input/output/result paths 
 ## Results and recovery
 
 - `complete` means the operation produced a matching, hashed output. It does not mean sources are complete, editorial review passed, or a proof was visually inspected.
+- `pending / word_unavailable` means Word is not available through its running COM object. Open Word without documents, then retry with a new job; normal deferral releases desktop ownership.
 - `pending / user_documents_open` is safe to retry as a new job after the user finishes editing. Do not close their documents.
 - `pending / operation_may_still_be_active` retains `desktop.lock`. Do not delete it, start another worker, terminate native apps, or repeat the request. Inspect the saved request, stage PID, worker log and any result; resolve ownership before a separately authorized recovery action.
 - A worker error or ambiguous launch likewise retains the lock. A process ID alone is insufficient to prove that a restarted process is the original worker.
@@ -18,6 +19,6 @@ Requests carry an ID, allowlisted operation, absolute input/output/result paths 
 
 `Codex_ServicePacketDesktopWorker` is registered with no triggers, InteractiveToken logon, limited privileges, IgnoreNew instance policy and no Task Scheduler execution-time kill. Its sole spool is `C:/worktrees/Document-Generator/weekly-service-packet/state/service_packets/desktop`. The task executes `tools/service_packets/run_queued_job.ps1` using the existing repository Python environment. Retain this worktree and interpreter while the task references them; deployment relocation must update and reverify the task explicitly.
 
-An explicitly initiated dispatch writes an immutable input snapshot and an atomic `dispatch.json` request into that spool, then calls `Start-ScheduledTask -TaskName Codex_ServicePacketDesktopWorker`. Do not replace dispatch while a job/ownership lock is active. `service_packets.scheduled` validates cached completed results rather than launching them again. This is a low-level operator procedure; the automatic producer/agent skill is not deployed yet.
+An explicitly initiated dispatch writes an immutable input snapshot and an atomic `dispatch.json` request into that spool, then calls `Start-ScheduledTask -TaskName Codex_ServicePacketDesktopWorker`. Do not replace dispatch while a job/ownership lock is active. `service_packets.scheduled` validates cached completed results rather than launching them again. The preparation/finalization skills use this same entry point. The worker has no recurring timer of its own.
 
-Real acceptance through Windows Task Scheduler exported a one-page Camera proof with exit code 0; its pixels matched the previously inspected proof. Automated ownership reconciliation is not implemented. No recurring Windows timer or Codex schedule was added; the existing legacy weekly export task remains unchanged.
+Real acceptance through Windows Task Scheduler exported a one-page Camera proof with exit code 0; its pixels matched the previously inspected proof. Automated ownership reconciliation is not implemented. The old Windows exporter is retained until the replacement Codex scheduled-runtime acceptance passes; check the cutover status record for its current state.
