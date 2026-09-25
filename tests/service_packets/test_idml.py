@@ -77,3 +77,27 @@ def test_retains_configured_standing_closing_text_and_formatting(tmp_path):
     assert [e.text for e in root.iter('Content')] == [
         'New worship order', 'Our worship through service now begins.']
     assert ET.tostring(root.find('.//Story')[-1]) == ET.tostring(ET.fromstring(closing))
+
+
+def test_bulletin_editorial_rules_preserve_source_and_other_services(tmp_path):
+    from copy import deepcopy
+    original = baseline(tmp_path/'base.idml')
+    service = {'key': 'early_traditional', 'heading_paragraphs': [], 'bulletin_paragraphs': [
+        {'style': 'Body', 'text': 'Call to Worship (from Psalm 145)'},
+        {'style': 'Body', 'text': 'Benediction Response\tTitle\tComposer'},
+        {'style': 'Body', 'text': 'Trinity Chimes'},
+        {'style': 'Body', 'text': 'Doxology\tUMH 95'}]}
+    before = deepcopy(service)
+    layout = {'allowed_styles': ['Body'], 'bulletin_label_aliases': {
+        'Call to Worship': 'Call to Worship', 'Benediction Response': 'Choral Response'},
+        'omit_labels_by_service': {'early_traditional': ['Trinity Chimes']}}
+    target = tmp_path/'early.idml'
+    render_idml(original, service, layout, target)
+    with ZipFile(target) as z:
+        texts = [n.text for n in ET.fromstring(z.read('Stories/Story_s1.xml')).iter('Content')]
+    assert texts == ['Call to Worship', 'Choral Response\tTitle\tComposer', 'Doxology\t\tUMH 95']
+    assert service == before
+    service['key'] = 'main'
+    render_idml(original, service, layout, tmp_path/'main.idml')
+    with ZipFile(tmp_path/'main.idml') as z:
+        assert 'Trinity Chimes' in [n.text for n in ET.fromstring(z.read('Stories/Story_s1.xml')).iter('Content')]

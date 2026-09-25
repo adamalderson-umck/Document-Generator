@@ -44,3 +44,9 @@ For bulletin tab fields, preserve the empty title column when a reference belong
 ## Broadcast boundary
 
 The Camera sheet stops before Exit Music because the broadcast ends there. Keep Benediction Response, Postlude and Trinity Chimes when present in the canonical order. Sound and Proclaim retain Exit Music. Identify the exit selection with kind `exit_music` (the exact Nathan label `Exit Music` is also recognized). Do not drop Benediction Response to reproduce the September 20 canonical Camera oversight, which the user explicitly confirmed.
+
+## Standing traditional music and bulletin terminology
+
+User-confirmed standing rules: Dawn's organ prelude and postlude apply to both early_traditional (8:30) and main, unless an explicit service-specific correction supersedes them. Scope the organ source to both services and retain the standing applicability authority plus original email evidence. Use the verified composer spelling in both. The early offertory uses the organ Exit Music selection; New Spirit remains main only. Preserve Nathan's original evidence, but omit Trinity Chimes from the 8:30 bulletin under this explicit standing exception; do not omit it from main.
+
+The maintained layout configuration supplies bulletin-only labels: Praying with Our Community; Anthem; Choral Response (for the benediction response); Call to Worship (without the parenthetical reference). Do not rewrite source_wording or remove full prayers, references, response placement or verse details from Proclaim. Source interpretation must populate both services' music before building; the renderer never borrows another service's music by guessing from text.

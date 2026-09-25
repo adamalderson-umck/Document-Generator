@@ -65,13 +65,25 @@ def render_idml(baseline, service, layout, target):
             for paragraph in old_paragraphs:
                 story.remove(paragraph)
             for line in service[field]:
+                text = line['text']
+                if label == 'worship_order':
+                    fields = text.split('\t')
+                    original_label = fields[0].strip()
+                    if original_label in layout.get('omit_labels_by_service', {}).get(service.get('key'), []):
+                        continue
+                    aliases = layout.get('bulletin_label_aliases', {})
+                    lookup = 'Call to Worship' if original_label.startswith('Call to Worship (') else original_label
+                    fields[0] = aliases.get(lookup, fields[0])
+                    if original_label == 'Doxology' and len(fields) == 2:
+                        fields.insert(1, '')
+                    text = '\t'.join(fields)
                 style = line['style']
                 ref = 'ParagraphStyle/' + style
                 if style not in allowed or ref not in info['styles']:
                     raise ValueError(f'Unknown or unapproved paragraph style: {style}')
                 # Use explicit styles; do not inherit arbitrary old per-entry overrides.
                 paragraph = ET.SubElement(story, 'ParagraphStyleRange', AppliedParagraphStyle=ref)
-                for part in line['text'].split('\n'):
+                for part in text.split('\n'):
                     run = ET.SubElement(paragraph, 'CharacterStyleRange', AppliedCharacterStyle='CharacterStyle/$ID/[No character style]')
                     ET.SubElement(run, 'Content').text = part
                     ET.SubElement(run, 'Br')
