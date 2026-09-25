@@ -109,7 +109,7 @@ def test_failed_atomic_promotion_preserves_previous_pointer(tmp_path, monkeypatc
 
 
 @pytest.mark.parametrize('baseline_state', ['valid', 'stale', 'missing', 'modified'])
-def test_next_week_build_uses_promoted_baseline_for_all_three_services(tmp_path, baseline_state):
+def test_main_stage_uses_previous_week_baseline_and_defers_early_services(tmp_path, baseline_state):
     from docx import Document
     from service_packets.build import build_packet
     from service_packets.model import ROLES
@@ -142,10 +142,10 @@ def test_next_week_build_uses_promoted_baseline_for_all_three_services(tmp_path,
         document.save(templates[kind])
     result = build_packet(packet, root, {'allowed_styles': ['OOW Body']}, {}, templates)
     if baseline_state != 'valid':
-        assert len(result['artifacts']) == 2
+        assert len(result['artifacts']) == 3
         assert any(issue['code'] == 'baseline_unavailable' for issue in result['issues'])
         return
-    assert len(result['artifacts']) == 5
+    assert len(result['artifacts']) == 4
     repeated = build_packet(packet, root, {'allowed_styles': ['OOW Body']}, {}, templates)
     assert repeated['revision'] == result['revision']
     assert repeated['reused'] is True

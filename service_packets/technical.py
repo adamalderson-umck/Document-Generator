@@ -47,7 +47,7 @@ def render_technical(service, cues, templates, directory):
             row._tr.get_or_add_trPr().append(OxmlElement('w:cantSplit'))
             for cell in row.cells:
                 cell.text = ''
-            text = item.get('display_wording') or item['source_wording']
+            text = item.get('technical_wording') or item.get('display_wording') or item['source_wording']
             text = '\n'.join(' — '.join(part.strip() for part in line.split('\t') if part.strip())
                              for line in text.split('\n'))
             row.cells[0 if kind == 'cameras' else 1].text = text

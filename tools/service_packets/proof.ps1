@@ -35,8 +35,15 @@ if ($job.format -in @('idml', 'indd')) {
         $result.proof_status = 'visual_review_pending'
     }
 } elseif ($job.format -eq 'docx') {
-    $app = [Runtime.InteropServices.Marshal]::GetActiveObject('Word.Application')
-    if ($app.Documents.Count -ne 0) {
+    $app = $null
+    try { $app = [Runtime.InteropServices.Marshal]::GetActiveObject('Word.Application') }
+    catch {
+        if ($_.Exception.GetBaseException().HResult -ne -2147221021) { throw }
+        $result.reason = 'word_unavailable'
+    }
+    if ($null -eq $app) {
+        $result.reason = 'word_unavailable'
+    } elseif ($app.Documents.Count -ne 0) {
         $result.reason = 'user_documents_open'
     } else {
         $owned = $null

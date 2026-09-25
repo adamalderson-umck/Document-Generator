@@ -77,3 +77,13 @@ def test_rejects_parent_cycles():
     data['services'][0]['items'][0]['parent_id'] = 'prayer'
     with pytest.raises(ValueError, match='parent'):
         validate_packet(data)
+
+
+def test_proclaim_details_require_scoped_evidence():
+    data = packet()
+    item = data['services'][0]['items'][0]
+    item['proclaim'] = [{'label': 'Lyrics', 'text': 'Supplied text', 'evidence': []}]
+    with pytest.raises(ValueError, match='evidence'):
+        validate_packet(data)
+    item['proclaim'][0]['evidence'] = item['evidence']
+    assert validate_packet(data)['services'][0]['items'][0]['proclaim']

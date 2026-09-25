@@ -31,11 +31,37 @@ Save Google connector content locally with document/revision/tab identity and re
 
 Within a date, select the intended service subsection: morning worship, Charge Conference, and other events are distinct. Never merge them. Match explicit role labels such as Opening Hymn or Offertory to the corresponding slots in Nathan's order. For an unlabeled song list, use list order only when the song count and ordered song slots make the relationship unambiguous; otherwise flag uncertain placement. A medley stays one selection. Retain performers and credits, remove catalog numbers only as metadata, and do not silently normalize an unfamiliar title. An empty section means not supplied, not explicitly no music. An explicit "None" applies only to its named slot. Distinguish supplied, not_supplied, explicitly_absent and unresolved values. Google scripture is supporting context and cannot override Nathan's selected reading. Modern music applies to a combined main service only with explicit applicability evidence.
 
+## Standing music authority
+
+Frank's labeled response instructions control response presence and placement. Prayer responses follow the pastoral prayer and Lord's Prayer; benediction responses follow the benediction. Explicit None omits the response. Nathan need not list the response separately. This user-authorized exception applies consistently to bulletin, Camera, Sound and Proclaim drafts. Preserve the original order and link each response to Nathan's anchor item plus Frank's email. Missing/ambiguous anchors still require review.
+
+Spell-check Dawn's composers and arrangers against authoritative work/score/publisher references, restoring supported diacritics. Retain original spelling and the verified display name with citation. Do not guess an accent, expanded name or composer identity; flag uncertain matches. Camera/Sound element cells stay designation/title only; verified credits belong in bulletin and Proclaim details.
+
+## Modern worship recording artist credits
+
+For the 9:30 bulletin, research a recording-artist display credit for every selected song. Prefer the specific version identified by the Google Doc's recording links or arrangement details. Verify official artist/label/release information. Without version evidence, a clearly supported commonly associated recording artist may be used, with the basis recorded; flag ambiguous song identities or competing versions rather than guessing or implying the team's arrangement is known. Do not equate songwriter, original recording artist, local performer and recording artist.
+
+Keep the source song text, recording-artist credit, songwriter/composer metadata, supporting URL, retrieval date and rationale separate. Preserve medleys and research their components individually. Display the supported recording artist in the existing composer-slot position in the modern bulletin only; retain an unresolved finding when no reliable match is available. Read back the generated story to check each artist remains paired with the right song. This enrichment does not authorize changing the order or music selection, nor adding composer/artist detail to the concise Camera/Sound cells.
+
+Apply credits when generating the 9:30 draft, not by synchronizing or overwriting files after the user's manual finishing edits. This enrichment runs during source preparation; the staged builder controls when each bulletin is produced.
+
 ## Interpretation and verification
 
 The agent constructs JSON using `model.py`, `idml.py` and `technical.py`; users do not maintain it. The DOCX remains source evidence even when Nathan explicitly corrects it. Store corrected values with correction-source evidence, and change the item's display wording and the corresponding bulletin paragraphs. The builder does not automatically synchronize those independently authored fields.
 
 After building, read the actual IDML story XML and DOCX contents: verify every corrected reading/title against the accepted value in all dependent artifacts, and confirm the original wording remains in the source record. Do not merely inspect `values` in JSON. Review order and music scope separately from mechanical validation. Proof and visual status must remain distinct from generation status.
+
+## Two-stage build API
+
+`build_packet(packet, data_root, layout, cues, templates, phase="main")` is the default. Retain all three orders in the packet for source review, but generate only the main bulletin plus Camera, Sound and Proclaim. Main uses last Sunday's explicitly finalized main baseline. A missing baseline does not prevent the three DOCX drafts. Missing orders never establish a combined service.
+
+After the user updates the common stories and explicitly designates the saved main final, use the finalization skill. Copy the returned `baseline` into an independent packet copy, then call `build_packet(..., phase="early")`. This requires a finalized main baseline with exactly the packet date; old-date exception evidence cannot bypass it. It generates only the available early/modern bulletins, each from the same frozen baseline, preserving all other IDML members. Do not run this stage for a combined service. Do not reuse phase-one packet.baseline, which is deliberately frozen to the previous week.
+
+Revisions include the phase in build identity. Existing edited handoffs are never overwritten; later common edits and finishing tweaks remain manual. A later final main can serve next week, but it cannot replace a different Sunday's same-week baseline for an early build.
+
+### Proclaim enrichment contract
+
+Main items carry `proclaim`: a nonempty list of `{label, text, evidence}` blocks. Each evidence reference must resolve within main-service scope. Place all supplied lyrics, verse restrictions, performers, verified composer/arranger credits, publishing information, prayers/responses and slide instructions with their item. Use `proclaim_notes` for sourced review notes and missing asset references. The reusable renderer generates the full ordered internal DOCX and flags missing enrichment rather than silently claiming completeness. Keep source spelling, accepted correction and supporting authority distinct. No page-count optimization is required.
 
 ## Finalization and deployment gates
 

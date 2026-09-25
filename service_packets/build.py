@@ -9,9 +9,13 @@ from pathlib import Path
 from .idml import render_idml
 from .model import validate_packet
 from .technical import render_technical
+from .proclaim import render_proclaim
 
 
-def build_packet(packet, root, layout, cues, templates):
+def build_packet(packet, root, layout, cues, templates, *, phase="main"):
+    """Main: prior-week baseline + four drafts. Early: finalized same-week baseline."""
+    if phase not in {"main", "early"}:
+        raise ValueError("Unknown preparation phase")
     packet = validate_packet(packet)
     state = Path(root)/'state/service_packets'
     state.mkdir(parents=True, exist_ok=True)
@@ -19,7 +23,7 @@ def build_packet(packet, root, layout, cues, templates):
     with lock.open('x', encoding='utf-8') as stream:
         stream.write(str(os.getpid()))
     try:
-        return _build_packet(packet, root, layout, cues, templates)
+        return _build_packet(packet, root, layout, cues, templates, phase)
     finally:
         lock.unlink()
 
@@ -31,7 +35,8 @@ def _file_identity(path):
         return 'unavailable'
 
 
-def _build_packet(packet, root, layout, cues, templates):
+def _build_packet(packet, root, layout, cues, templates, phase):
+    selected = [s for s in packet["services"] if (s["key"] == "main") == (phase == "main")]
     if 'baseline' not in packet:
         pointer = Path(root)/'state/service_packets/baseline.json'
         try:
@@ -51,9 +56,9 @@ def _build_packet(packet, root, layout, cues, templates):
         dependencies[packet['baseline']['path']] = _file_identity(packet['baseline']['path'])
     code = {path.name: _file_identity(path) for path in Path(__file__).parent.glob('*.py')}
     identity = sha256(json.dumps({'packet': packet, 'layout': layout, 'cues': cues,
-                                 'dependencies': dependencies, 'renderer': code},
+                                 'dependencies': dependencies, 'renderer': code, 'phase': phase},
                                 sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
-    expected_count = len(packet['services']) + (2 if any(s['key'] == 'main' for s in packet['services']) else 0)
+    expected_count = len(selected) + (3 if any(s['key'] == 'main' for s in selected) else 0)
     for manifest in sorted(parent.glob('rev-*/manifest.json'), reverse=True):
         try:
             previous = json.loads(manifest.read_text(encoding='utf-8'))
@@ -75,9 +80,11 @@ def _build_packet(packet, root, layout, cues, templates):
             continue
     else:
         raise RuntimeError('Revision allocation exhausted')
-    result = {'date': packet['date'], 'revision': directory.name, 'artifacts': [],
+    result = {'date': packet['date'], 'phase': phase, 'revision': directory.name, 'artifacts': [],
               'build_identity': identity, 'reused': False,
               'issues': packet['issues'], 'review_path': str(directory/'review.md')}
+    if phase == 'main' and any(s['key'] != 'main' for s in packet['services']):
+        result['issues'].append({'code': 'early_generation_deferred', 'message': 'Early bulletins await this Sunday\'s explicitly finalized main bulletin.'})
     baseline = packet.get('baseline')
     frozen = None
     if not baseline:
@@ -86,7 +93,9 @@ def _build_packet(packet, root, layout, cues, templates):
         try:
             if baseline.get('service') != 'main' or not baseline.get('finalized'):
                 raise ValueError('Baseline must be explicitly designated finalized main service')
-            expected = (date.fromisoformat(packet['date'])-timedelta(days=7)).isoformat()
+            expected = packet['date'] if phase == 'early' else (date.fromisoformat(packet['date'])-timedelta(days=7)).isoformat()
+            if phase == 'early' and baseline.get('date') != expected:
+                raise ValueError('Early generation requires an explicitly finalized same-week main baseline')
             if baseline.get('date') != expected and not baseline.get('exception_evidence'):
                 raise ValueError('Baseline is stale; explicit exception required')
             content = Path(baseline['path']).read_bytes()
@@ -99,7 +108,7 @@ def _build_packet(packet, root, layout, cues, templates):
         except (OSError, ValueError) as exc:
             result['issues'].append({'code': 'baseline_unavailable', 'message': str(exc)})
             frozen = None
-    for service in packet['services']:
+    for service in selected:
         service['date'] = packet['date']
         prefix = service['time'].replace(':', '')
         if frozen is not None:
@@ -113,6 +122,12 @@ def _build_packet(packet, root, layout, cues, templates):
                 result['issues'].append({'code': 'bulletin_unavailable', 'service': service['key'], 'message': str(exc)})
         if service['key'] == 'main':
             try:
+                artifact = render_proclaim(service, packet, directory/f'{prefix}-proclaim.docx')
+                artifact['service'] = 'main'
+                result['artifacts'].append(artifact)
+            except (OSError, ValueError) as exc:
+                result['issues'].append({'code': 'proclaim_unavailable', 'service': 'main', 'message': str(exc)})
+            try:
                 artifacts = render_technical(service, cues, templates, directory)
                 for artifact in artifacts:
                     artifact['service'] = 'main'
@@ -124,7 +139,7 @@ def _build_packet(packet, root, layout, cues, templates):
     for artifact in result['artifacts']:
         text.append(f"- {Path(artifact['path']).name}: generated; proof pending.")
         if artifact.get('findings'):
-            text.append(f"  Unconfirmed cues: {len(artifact['findings'])}.")
+            text.append(f"  Review findings: {len(artifact['findings'])}.")
     for issue in result['issues']:
         text.append(f"- {issue.get('service', 'packet')}: {issue['code']} — {issue.get('message', '')}")
     Path(result['review_path']).write_text('\n'.join(text)+'\n', encoding='utf-8')

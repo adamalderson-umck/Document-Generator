@@ -32,3 +32,7 @@ For a saved INDD:
 Read the returned capture and baseline pointer, and verify hashes/files. A capture record states promotion intent; the atomically replaced pointer establishes actual promotion. Native export does not establish editorial or visual approval. Report overset as human cleanup; never silently shrink or remove content.
 
 Report exact captured paths, whether the main pointer changed, missing technical finals and any pending export. Distinguish `queue_job` refusal from a worker's pending result. Ownership recovery remains manual: preserve evidence and request reconciliation, not permission to force-close apps. Do not enable, replace or merge schedules as part of finalization.
+
+## Same-week early-service handoff
+
+After an explicitly designated main final has been captured successfully, complete the user-approved second stage for an ordinary Sunday when its interpreted source packet is available. Read the preparation skill. Make a packet copy with `baseline` set to the returned capture and the same Sunday date; call `build_packet(..., phase="early")`. This generates only 8:30/9:30 drafts independently from that final. Do not rebuild the finalized main, infer cancellation from missing orders, or overwrite later manual edits. If the interpreted packet is missing, report the dependency rather than reusing last week's orders. Combined services require no early generation. Capturing a previous week only to establish the next production baseline does not request regeneration of already finished early bulletins.

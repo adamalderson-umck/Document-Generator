@@ -61,6 +61,10 @@ def validate_packet(packet):
         for source_id in service.get('music_sources', []):
             if source_id not in sources or role not in sources[source_id]['scope']:
                 raise ValueError('Music source outside service scope')
+        for block in service.get('proclaim_notes', []):
+            if not isinstance(block.get('text'), str) or not block['text'].strip():
+                raise ValueError('Empty Proclaim note')
+            evidence(block.get('evidence'), role)
         ids = {}
         for item in service.get('items', []):
             key = item.get('id')
@@ -78,6 +82,15 @@ def validate_packet(packet):
                     raise ValueError(f'Invalid value status: {name}')
                 if value['status'] in ('supplied', 'explicitly_absent'):
                     evidence(value.get('evidence'), role)
+            if 'technical_wording' in item and (not isinstance(item['technical_wording'], str) or not item['technical_wording'].strip()):
+                raise ValueError('Invalid technical wording')
+            if 'proclaim' in item:
+                if not isinstance(item['proclaim'], list) or not item['proclaim']:
+                    raise ValueError('Proclaim enrichment must contain at least one block')
+                for block in item['proclaim']:
+                    if not isinstance(block.get('text'), str) or not block['text'].strip():
+                        raise ValueError('Empty Proclaim detail')
+                    evidence(block.get('evidence'), role)
             ids[key] = item
         for item in ids.values():
             visited = {item['id']}

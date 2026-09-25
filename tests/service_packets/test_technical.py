@@ -85,3 +85,21 @@ def test_standing_defaults_apply_except_for_explicit_exceptions(tmp_path):
         assert doc.tables[0].rows[1].cells[cue_column].text == 'Organ'
         assert 'Soloist replaces organ' in doc.tables[0].rows[2].cells[cue_column].text
         assert [finding['item_id'] for finding in result['findings']] == ['special']
+
+
+def test_concise_technical_wording_for_both_sheets_preserves_cues(tmp_path):
+    item = {'id': 'anthem', 'source_wording': 'Anthem',
+            'display_wording': 'Anthem\tMusic\tComposer\nSoloist; slide details',
+            'technical_wording': 'Anthem\tMusic', 'cue_key': 'choir'}
+    service = {'key': 'main', 'time': '10:30', 'date': '2099-09-20', 'items': [item]}
+    cues = {'defaults': {'choir': {'convention_id': 'approved',
+                                  'cameras': ['Choir', '', '', 'Lyrics'], 'sound': ['Choir']}}}
+    out = tmp_path/'out'
+    out.mkdir()
+    for result in render_technical(service, cues, templates(tmp_path), out):
+        row = Document(result['path']).tables[0].rows[1]
+        text_column = 0 if result['kind'] == 'cameras' else 1
+        cue_column = 1 if result['kind'] == 'cameras' else 0
+        assert row.cells[text_column].text == 'Anthem — Music'
+        assert row.cells[cue_column].text == 'Choir'
+    assert 'Composer' in item['display_wording']
