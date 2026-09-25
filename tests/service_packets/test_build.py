@@ -66,6 +66,9 @@ def test_early_phase_requires_same_week_final_and_preserves_common_members(
         assert any(i['code'] == 'baseline_unavailable' for i in result['issues'])
         return
     assert {a['service'] for a in result['artifacts']} == {'early_traditional', 'modern'}
+    personnel = [i for i in result['issues'] if i['code'] == 'inherited_personnel_manual_replacement']
+    assert {i['service'] for i in personnel} == {'early_traditional', 'modern'}
+    assert 'NOT verified' in Path(result['review_path']).read_text(encoding='utf-8')
     for artifact in result['artifacts']:
         with ZipFile(original) as a, ZipFile(artifact['path']) as b:
             for name in a.namelist():

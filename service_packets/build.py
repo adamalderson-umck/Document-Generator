@@ -116,8 +116,13 @@ def _build_packet(packet, root, layout, cues, templates, phase):
                 artifact = render_idml(frozen, service, layout, directory/f'{prefix}-bulletin.idml')
                 artifact['service'] = service['key']
                 result['artifacts'].append(artifact)
-                result['issues'].append({'code': 'inherited_copy_unverified', 'service': service['key'],
-                                         'message': 'Review inherited calendar, announcements, leaders, flowers and service-specific copy.'})
+                if phase == 'early':
+                    result['issues'].append({'code': 'inherited_personnel_manual_replacement',
+                                             'service': service['key'],
+                                             'message': 'Personnel are inherited from the main service and are NOT verified for this service. Replace the welcome team, worship leaders and technical team manually before publication; review other service-specific copy. Calendar and announcements retain the same-week finalized main content.'})
+                else:
+                    result['issues'].append({'code': 'inherited_copy_unverified', 'service': service['key'],
+                                             'message': 'Review inherited calendar, announcements, leaders, flowers and service-specific copy.'})
             except (OSError, ValueError) as exc:
                 result['issues'].append({'code': 'bulletin_unavailable', 'service': service['key'], 'message': str(exc)})
         if service['key'] == 'main':

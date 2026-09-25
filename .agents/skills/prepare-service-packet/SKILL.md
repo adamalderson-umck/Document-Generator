@@ -34,3 +34,13 @@ For each main-service item, author a nonempty `proclaim` list of blocks: `{ "lab
 Queue native proof jobs with `scheduled.queue_job`, then start the registered on-demand task. Never replace dispatch directly, bypass locks, create another spool, or clear a lock because it is old. Busy apps defer proof; unresolved desktop ownership blocks desktop work, not independent local generation. Inspect every new proof page; identical raster comparisons may cover unchanged pages.
 
 Read actual output XML/DOCX text and verify every accepted correction in all dependent artifacts; the builder does not synchronize values, display wording and bulletin paragraphs automatically. Deliver exact artifact links and separate generation, proof and editorial status. Text fit, overset and panel breaks are human cleanup, not delivery blockers or permission to shrink/delete content. Reused drafts retain pending proof work. Corrections create new revisions; never overwrite handoffs or promote a draft as next week's baseline.
+
+## Early-service personnel handoff
+
+Personnel are not assumed common across services. Keep the inherited main-service story unchanged in early drafts, but explicitly flag welcome-team, worship-leader and technical-team details for the user to replace manually before publication. Do not claim service personnel are verified merely because common IDML members were preserved. This is the user-approved manual finishing boundary.
+
+For bulletin tab fields, preserve the empty title column when a reference belongs in the rightmost field: `Doxology\t\tUMH 95`, not `Doxology\tUMH 95`. Keep this bulletin presentation separate from compact technical wording. Mechanical acceptance does not establish canonical equivalence; completed-week validation must compare the designated final outputs and classify expected human edits and source/final conflicts explicitly.
+
+## Broadcast boundary
+
+The Camera sheet stops before Exit Music because the broadcast ends there. Keep Benediction Response, Postlude and Trinity Chimes when present in the canonical order. Sound and Proclaim retain Exit Music. Identify the exit selection with kind `exit_music` (the exact Nathan label `Exit Music` is also recognized). Do not drop Benediction Response to reproduce the September 20 canonical Camera oversight, which the user explicitly confirmed.

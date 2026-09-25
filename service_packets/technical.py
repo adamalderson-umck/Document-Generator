@@ -41,7 +41,14 @@ def render_technical(service, cues, templates, directory):
         repeat = OxmlElement('w:tblHeader')
         table.rows[0]._tr.get_or_add_trPr().append(repeat)
         findings = []
-        for item in service['items']:
+        items = service['items']
+        if kind == 'cameras':
+            # Standing user rule: the broadcast ends before Exit Music.
+            end = next((index for index, item in enumerate(items)
+                        if item.get('kind') == 'exit_music'
+                        or item['source_wording'].strip().casefold() == 'exit music'), len(items))
+            items = items[:end]
+        for item in items:
             table._tbl.append(deepcopy(row_template))
             row = table.rows[-1]
             row._tr.get_or_add_trPr().append(OxmlElement('w:cantSplit'))
@@ -68,6 +75,7 @@ def render_technical(service, cues, templates, directory):
             doc.save(stream)
         results.append({'kind': kind, 'format': 'docx', 'path': str(target),
                         'sha256': sha256(target.read_bytes()).hexdigest(),
-                        'item_ids': [i['id'] for i in service['items']],
+                        'item_ids': [i['id'] for i in items],
+                        'omitted_item_ids': [i['id'] for i in service['items'][len(items):]],
                         'generation_status': 'generated', 'proof_status': 'pending', 'findings': findings})
     return results

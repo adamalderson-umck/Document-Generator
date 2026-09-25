@@ -40,7 +40,8 @@ def run(packet_path, baseline_path, runtime_path, output_root):
     for path, digest in inputs.items():
         if sha256(Path(path).read_bytes()).hexdigest() != digest:
             raise ValueError('Acceptance modified an input')
-    result = {'status': 'passed', 'finished_at': datetime.now(timezone.utc).isoformat(),
+    result = {'status': 'passed', 'validation_scope': 'mechanical_build_only',
+              'canonical_comparison': 'not_performed_by_this_script', 'finished_at': datetime.now(timezone.utc).isoformat(),
               'main': first, 'early': second, 'input_hashes': inputs,
               'google_access': 'must_be_verified_by_calling_agent',
               'native_proof': 'separate_worker_validation'}

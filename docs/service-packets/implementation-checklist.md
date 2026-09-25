@@ -2,7 +2,7 @@
 
 - [x] Explicit main and early phases with same-week final guard and protected revisions.
 - [x] Reusable Proclaim rendering integrated in main packet, with evidence-backed details and visible gaps.
-- [x] Real-source content acceptance of responses, composer corrections, artist credits and same-week common-story inheritance.
+- [ ] Canonical content acceptance: mechanical and selected source checks passed, but September 20 comparison found unresolved source/final editorial differences. See the canonical comparison report in the original project outputs/canonical-comparison-2026-09-20.
 - [x] Commit reviewed code and instructions after tests (48b99b8).
 - [ ] Replace legacy automation, verify scheduled runtime and Google access, disable old Windows export only after acceptance.
 

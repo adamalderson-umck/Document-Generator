@@ -84,3 +84,11 @@ record = finalize_worker_export(data_root, designation, request, result)
 For INDD, the request input is a saved-file snapshot inside the sole spool; designation.path remains the original user-designated INDD. `finalize_worker_export` validates the nested native result and original hash, then passes the exported IDML to finalization with original-source provenance. The older direct adapter's `format`/`sha256` envelope is not the registered worker's `operation`/`input_hash` envelope; never connect them by guessing field names. Pending export means no promotion. Missing resources prevent native promotion; fit findings do not. After promotion, verify baseline.json references the returned captured path/hash/service/date. Early capture leaves its previous bytes unchanged.
 
 No recurring workflow is activated yet. Before cutover: verify a complete ordinary three-service run from current connectors, scheduled Google access, user-approved timing, and explicit replacement of the old automation/export schedule. Preserve old settings for rollback. See `desktop-jobs.md` for ownership recovery; never clear a lock based on age.
+
+## Early-service personnel handoff
+
+Personnel are not assumed common across services. Keep the inherited main-service story unchanged in early drafts, but explicitly flag welcome-team, worship-leader and technical-team details for the user to replace manually before publication. Do not claim service personnel are verified merely because common IDML members were preserved. This is the user-approved manual finishing boundary.
+
+## Broadcast boundary
+
+The Camera sheet stops before Exit Music because the broadcast ends there. Keep Benediction Response, Postlude and Trinity Chimes when present in the canonical order. Sound and Proclaim retain Exit Music. Identify the exit selection with kind `exit_music` (the exact Nathan label `Exit Music` is also recognized). Do not drop Benediction Response to reproduce the September 20 canonical Camera oversight, which the user explicitly confirmed.

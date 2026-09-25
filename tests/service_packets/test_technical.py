@@ -103,3 +103,23 @@ def test_concise_technical_wording_for_both_sheets_preserves_cues(tmp_path):
         assert row.cells[text_column].text == 'Anthem — Music'
         assert row.cells[cue_column].text == 'Choir'
     assert 'Composer' in item['display_wording']
+
+
+@pytest.mark.parametrize('exit_kind,exit_wording', [('worship_element', 'Exit Music'), ('exit_music', 'Organ recessional')])
+def test_camera_stops_before_exit_music_but_sound_retains_full_order(tmp_path, exit_kind, exit_wording):
+    items = [{'id': 'response', 'source_wording': 'Benediction Response'},
+             {'id': 'postlude', 'source_wording': 'Postlude'},
+             {'id': 'chimes', 'source_wording': 'Trinity Chimes'},
+             {'id': 'exit', 'source_wording': exit_wording, 'kind': exit_kind}]
+    service = {'key': 'main', 'time': '10:30', 'date': '2099-09-20', 'items': items}
+    out = tmp_path/'out'
+    out.mkdir()
+    results = {r['kind']: r for r in render_technical(service, {}, templates(tmp_path), out)}
+    camera = results['cameras']
+    sound = results['sound']
+    assert camera['item_ids'] == ['response', 'postlude', 'chimes']
+    assert camera['omitted_item_ids'] == ['exit']
+    assert [r.cells[0].text for r in Document(camera['path']).tables[0].rows[1:]] == ['Benediction Response', 'Postlude', 'Trinity Chimes']
+    assert sound['item_ids'] == ['response', 'postlude', 'chimes', 'exit']
+    assert Document(sound['path']).tables[0].rows[-1].cells[1].text == exit_wording
+    assert [i['id'] for i in service['items']] == sound['item_ids']
