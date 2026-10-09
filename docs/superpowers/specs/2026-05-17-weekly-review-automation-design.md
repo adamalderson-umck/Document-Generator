@@ -1,0 +1,177 @@
+# Weekly Review Automation Design
+
+## Purpose
+
+Document Generator should move from manual upload and pasted email parsing toward a weekly Codex-prepared review packet. The Friday automation will gather the same recurring church planning inputs the user already receives, extract all previously supported worship-order and music fields plus any additional current template variables, and leave a generator-ready JSON file for review in the GUI.
+
+The goal is not full unattended document production. The goal is a reliable "prepare, review, generate" workflow where Codex handles extraction and the user keeps the final production click.
+
+## Current System
+
+The app currently has these working pieces:
+
+- `parse_source_doc()` extracts service data from a source `.docx`.
+- `parse_email_text()` extracts music data from pasted organist and choir emails.
+- `get_missing_variables()` compares accumulated data to variables used in `docx_templates/`.
+- `generate_word_docs()` renders all local templates into `outputs/`.
+- The GUI stores parsed data in a session, asks for missing fields, then calls `/generate_final`.
+
+The new workflow should reuse `generate_word_docs()` and the template-variable discovery path. The extraction front door changes from manual upload/paste to a weekly review JSON.
+
+## Target Workflow
+
+Every Friday morning, a Codex automation targets the upcoming Sunday.
+
+1. Determine the upcoming Sunday service date from the automation run date.
+2. Search the local Outlook PST store `Adam Alderson`. If the store is not currently mounted in the Outlook profile, attempt to mount `C:\Users\kentu\AppData\Local\Microsoft\Outlook\Adam Alderson.pst` through Outlook COM and then re-scan the stores.
+3. Find the source worship-notes email in `Inbox\Staff\Nathan` using the subject marker `[Month] [DD] worship notes`, such as `May 24 worship notes`.
+4. Select the `10:30` `.docx` attachment from that email.
+5. Search music emails in `Inbox\Music` for the week preceding the service date.
+6. Extract values for the full review field set: canonical worship-order fields, canonical music fields, and any additional variables used by the current templates.
+7. Write a review JSON file to `inputs/weekly_reviews/YYYY-MM-DD-review.json`, where the date is the target service date.
+8. Leave final document generation to the GUI.
+
+If the PST cannot be mounted or the `Adam Alderson` store still cannot be found, the automation should not attempt a raw PST parse in version 1. It should write the review JSON with blank source-derived fields, set `_review.status` to `source_missing`, and include a clear note in `_review.sources` or `_review.notes`.
+
+If the Nathan email or `10:30` attachment cannot be found after the store is available, the automation should fall back to the newest plausible `.docx` already in `inputs/` and record that fallback in `_review`.
+
+Special mid-week services are out of scope for the recurring automation. They remain one-off workflows.
+
+## Review JSON Shape
+
+The review file should be directly usable by the generator. Top-level keys are the union of:
+
+- canonical worship-order fields from the source-document extraction channel
+- canonical music fields from the organist and choir extraction channels
+- any additional variables used by the current templates
+- a `_review` object
+
+The sample below is intentionally abbreviated. It demonstrates the shape, not the full field list.
+
+```json
+{
+  "date": "May 24, 2026",
+  "service_time": "10:30 am",
+  "sunday_title": "Day of Pentecost",
+  "hymn_1_num": "UMH 465",
+  "hymn_1_title": "Holy Spirit, Truth Divine",
+  "prelude_title": "Example",
+  "_review": {
+    "target_service_date": "2026-05-24",
+    "status": "needs_review",
+    "sources": [],
+    "attention_fields": [],
+    "missing_usual_fields": [],
+    "low_confidence_fields": [],
+    "conflicts": [],
+    "notes": []
+  }
+}
+```
+
+Top-level values should be strings unless an existing template variable already expects a boolean, such as `is_communion_sunday`.
+
+Blank values are allowed. Many fields are normally empty, and blanks must not block generation.
+
+## Attention Model
+
+The GUI should not ask the user to acknowledge every blank optional field. It should focus attention on fields that deserve a look.
+
+Attention fields include:
+
+- conflicting evidence from multiple messages
+- low-confidence extraction
+- a value that appears structurally odd, such as a hymn title with no hymn number
+- a field from the small "usually present" set that is blank
+- source-selection problems, such as no matching Nathan email or multiple `10:30` attachments
+
+Version 1 should use a simple hardcoded "usually present" set. Later versions can add history-based warnings from previous weekly review JSONs.
+
+## GUI Changes
+
+The GUI becomes a review console when a weekly review JSON exists.
+
+On load, the backend should expose the newest file in `inputs/weekly_reviews/`. The first screen should show:
+
+- target service date
+- source summary
+- attention fields with editable values
+- a Generate button
+
+There should also be an expandable all-fields view for complete review and editing.
+
+The existing upload and pasted-email workflow can remain available as a fallback/manual mode, but it should no longer be the primary path when a current weekly review exists.
+
+Generation should not be blocked by blank fields. Clicking Generate sends the reviewed JSON to the backend, merges site config, and calls the existing `generate_word_docs()` path.
+
+## Backend Changes
+
+Add endpoints or equivalent server functions for:
+
+- listing weekly review files
+- loading the latest weekly review
+- saving edits to a review JSON
+- generating documents from a review JSON
+
+Generation from a review file should reuse existing validation behavior where useful:
+
+- merge `site_config.local.json`
+- apply hymn-number formatting when users edit hymn-number fields
+- run `get_missing_variables()` only as an informational warning, not a blocker
+- call `generate_word_docs()`
+- report generated file paths in the GUI status log
+
+## Reusable Codex Skill
+
+The recurring workflow should live in a reusable Codex skill named `weekly-document-review`. The skill is the durable "how to prepare the weekly packet" layer; the cron automation is only the calendar trigger.
+
+The skill should live in the user's Codex skill directory, such as `C:\Users\kentu\.codex\skills\weekly-document-review`, so future Codex runs can discover it. It should include:
+
+- `SKILL.md` with the core workflow and trigger description
+- `references/source-selection.md` for Outlook store, folder, subject, date-window, and attachment-selection rules
+- `references/review-json.md` for the review JSON shape, field coverage rules, `_review` metadata, and attention-field policy
+
+The skill should not duplicate project-owned source-of-truth files. It should read this repository's `CONTEXT.md` for music terminology and use repository helpers such as `tools/export_weekly_sources.ps1`, `weekly_review.py`, and template-variable discovery when available.
+
+## Automation Behavior
+
+The recurring Codex automation should run Friday mornings and write the review packet only. It should not generate final documents.
+
+The automation prompt should be intentionally small: invoke the `weekly-document-review` skill for `E:\Coding Projects\Document-Generator`, target the upcoming Sunday in `America/New_York`, write `inputs/weekly_reviews/YYYY-MM-DD-review.json`, and do not generate final documents.
+
+Detailed source-selection, extraction, JSON-shape, and review-policy rules belong in the skill, not in the cron prompt.
+
+The automation should record enough source metadata in `_review.sources` to make the extraction auditable without dumping unnecessary full email bodies into the review file.
+
+## Privacy And Local Data
+
+Weekly review JSON files live under `inputs/weekly_reviews/`, inside the already git-ignored `inputs/` area. They may contain church-specific planning data and should remain local.
+
+Attachments saved for extraction should live in a local ignored temp/cache path, or be copied into `inputs/` only when needed for review. Generated documents remain in `outputs/`.
+
+## Testing And Verification
+
+Implementation should include tests for:
+
+- detecting current template variables
+- loading and saving weekly review JSON files
+- attention-field classification
+- generation from a review JSON
+- auto-mounting the known PST path when the Outlook store is not already mounted
+- fallback behavior when source email or attachment is missing
+- skill validation with the Codex skill validation script
+
+Manual verification should include the known May 17, 2026 sample:
+
+- Nathan email subject `May 17 worship notes`
+- attachment `Ascension Sunday 1030am.docx`
+- music emails from the preceding week
+- output review JSON containing canonical worship-order fields, canonical music fields, current template variables, and `_review`
+
+## Open Decisions
+
+No blocking decisions remain for the spec. Future implementation can refine:
+
+- exact hardcoded "usually present" field set
+- detailed `_review.sources` metadata shape
+- whether old weekly reviews should be archived, hidden, or simply listed

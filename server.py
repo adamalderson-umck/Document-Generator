@@ -11,6 +11,15 @@ from uuid import uuid4
 from extractors import parse_source_doc, parse_email_text
 from generators import generate_word_docs, get_missing_variables
 from site_config import merge_site_config
+from weekly_review import (
+    generator_data_from_review,
+    latest_review_path,
+    list_review_paths,
+    load_review,
+    refresh_review_attention,
+    safe_review_filename,
+    save_review,
+)
 
 app = FastAPI()
 
@@ -20,10 +29,12 @@ inputs_dir = os.path.join(BASE_DIR, "inputs")
 outputs_dir = os.path.join(BASE_DIR, "outputs")
 # Note: We renamed the docx folder to 'docx_templates' to avoid conflict
 docx_templates_dir = os.path.join(BASE_DIR, "docx_templates")
+weekly_reviews_dir = os.path.join(inputs_dir, "weekly_reviews")
 
 # Ensure dirs exist
 os.makedirs(inputs_dir, exist_ok=True)
 os.makedirs(outputs_dir, exist_ok=True)
+os.makedirs(weekly_reviews_dir, exist_ok=True)
 session_store_dir = os.path.join(inputs_dir, ".sessions")
 last_session_file = os.path.join(session_store_dir, "last_session_id.txt")
 
@@ -39,6 +50,10 @@ last_session_id = None
 class GenerateFinalPayload(BaseModel):
     session_id: str | None = Field(default=None, min_length=1)
     extra_fields: dict[str, str] = Field(default_factory=dict)
+
+
+class WeeklyReviewPayload(BaseModel):
+    review: dict = Field(default_factory=dict)
 
 
 def resolve_session(session_id):
@@ -128,6 +143,14 @@ def verify_generated_files(generated_files):
         )
 
 
+def generate_documents_from_data(data):
+    current_data = merge_site_config(dict(data))
+    missing_fields = get_missing_variables(current_data, docx_templates_dir)
+    generated_files = generate_word_docs(current_data, docx_templates_dir, outputs_dir)
+    verify_generated_files(generated_files)
+    return current_data, missing_fields, generated_files
+
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     asset_version = str(max(
@@ -142,6 +165,82 @@ async def read_root(request: Request):
 @app.get("/favicon.ico")
 async def favicon():
     return HTMLResponse(content="", status_code=204)
+
+
+@app.get("/weekly_reviews")
+def list_weekly_reviews():
+    paths = list_review_paths(weekly_reviews_dir)
+    filenames = [path.name for path in paths]
+    return {
+        "status": "success",
+        "reviews": filenames,
+        "latest": filenames[-1] if filenames else None,
+    }
+
+
+@app.get("/weekly_reviews/latest")
+def get_latest_weekly_review():
+    path = latest_review_path(weekly_reviews_dir)
+    if not path:
+        raise HTTPException(status_code=404, detail="No weekly review files found.")
+    return {
+        "status": "success",
+        "filename": path.name,
+        "review": load_review(path),
+    }
+
+
+@app.get("/weekly_reviews/{filename}")
+def get_weekly_review(filename: str):
+    try:
+        safe_name = safe_review_filename(filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    path = os.path.join(weekly_reviews_dir, safe_name)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Weekly review file not found.")
+    return {
+        "status": "success",
+        "filename": safe_name,
+        "review": load_review(path),
+    }
+
+
+@app.post("/weekly_reviews/{filename}")
+def save_weekly_review(filename: str, payload: WeeklyReviewPayload):
+    try:
+        safe_name = safe_review_filename(filename)
+        path = os.path.join(weekly_reviews_dir, safe_name)
+        review = refresh_review_attention(payload.review)
+        save_review(path, review)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"status": "success", "filename": safe_name, "review": review}
+
+
+@app.post("/weekly_reviews/{filename}/generate")
+def generate_from_weekly_review(filename: str, payload: WeeklyReviewPayload):
+    try:
+        safe_name = safe_review_filename(filename)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    path = os.path.join(weekly_reviews_dir, safe_name)
+    if not payload.review and not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Weekly review file not found.")
+    review = payload.review or load_review(path)
+    review = refresh_review_attention(review)
+    save_review(path, review)
+    data = generator_data_from_review(review)
+    current_data, missing_fields, generated_files = generate_documents_from_data(data)
+    return {
+        "status": "success",
+        "message": "Documents Generated Successfully!",
+        "output_dir": outputs_dir,
+        "generated_files": generated_files or [],
+        "missing_fields": missing_fields,
+        "warnings": current_data.get("_parse_warnings", []),
+    }
 
 
 @app.post("/upload_source")
@@ -253,20 +352,21 @@ async def generate_final(payload: GenerateFinalPayload):
                 extra_fields[key] = format_hymn_number(value)
 
         current_data.update(extra_fields)
-        current_data = merge_site_config(current_data)
         session["data"] = current_data
         if payload.session_id or last_session_id:
             save_session(payload.session_id or last_session_id, session)
 
-        # Generate Docs
-        generated_files = generate_word_docs(current_data, docx_templates_dir, outputs_dir)
-        verify_generated_files(generated_files)
+        current_data, missing_fields, generated_files = generate_documents_from_data(current_data)
+        session["data"] = current_data
+        if payload.session_id or last_session_id:
+            save_session(payload.session_id or last_session_id, session)
 
         return {
             "status": "success",
             "message": "Documents Generated Successfully!",
             "output_dir": outputs_dir,
             "generated_files": generated_files or [],
+            "missing_fields": missing_fields,
             "warnings": current_data.get("_parse_warnings", []),
         }
     except HTTPException:

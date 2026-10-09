@@ -5,6 +5,13 @@ from pathlib import Path
 import pytest
 
 
+FORBIDDEN_STRINGS_CONFIG_MESSAGE = (
+    "Configure PUBLIC_TEMPLATE_FORBIDDEN_STRINGS or create "
+    "template_identity_forbidden.local.txt with forbidden identity strings "
+    "separated by ||."
+)
+
+
 def load_forbidden_strings():
     env_value = os.environ.get("PUBLIC_TEMPLATE_FORBIDDEN_STRINGS", "")
     if env_value.strip():
@@ -18,7 +25,15 @@ def load_forbidden_strings():
             if value.strip()
         ]
 
-    return []
+    raise AssertionError(FORBIDDEN_STRINGS_CONFIG_MESSAGE)
+
+
+def test_load_forbidden_strings_requires_configuration(monkeypatch, tmp_path):
+    monkeypatch.delenv("PUBLIC_TEMPLATE_FORBIDDEN_STRINGS", raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(AssertionError, match="PUBLIC_TEMPLATE_FORBIDDEN_STRINGS"):
+        load_forbidden_strings()
 
 
 def read_docx_text(path: Path) -> str:
@@ -33,8 +48,6 @@ def read_docx_text(path: Path) -> str:
 
 def test_public_templates_do_not_contain_configured_private_identity_strings():
     forbidden_strings = load_forbidden_strings()
-    if not forbidden_strings:
-        pytest.skip("No public template identity forbidden strings configured")
 
     template_paths = sorted(Path("docx_templates").glob("*.docx"))
     violations = []

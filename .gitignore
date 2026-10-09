@@ -7,12 +7,14 @@ __pycache__/
 .pytest_cache/
 
 # Local inputs and generated outputs
+.agent/
 inputs/*
 !inputs/.gitkeep
 inputs/.sessions/
 outputs/*
 !outputs/.gitkeep
 state/service_packets/
+tmp/
 docx_templates/*.docx
 !docx_templates/.gitkeep
 site_config.local.json
