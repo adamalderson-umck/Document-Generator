@@ -170,6 +170,128 @@ textarea:focus {
     cursor: not-allowed;
 }
 
+.secondary-btn {
+    padding: 0.8rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--text-color);
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.secondary-btn:hover:not(:disabled) {
+    border-color: var(--accent-color);
+    color: white;
+}
+
+.secondary-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.review-meta {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+    color: #cbd5e1;
+    background: rgba(15, 23, 42, 0.35);
+}
+
+.review-source {
+    margin-bottom: 0.35rem;
+}
+
+.review-source:last-child {
+    margin-bottom: 0;
+}
+
+h3 {
+    margin: 1.5rem 0 0.75rem;
+    font-size: 1rem;
+    color: #cbd5e1;
+}
+
+.review-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.review-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.review-field input[type="text"] {
+    width: 100%;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    color: #fff;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.review-field input[type="text"]:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+.checkbox-field {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #cbd5e1;
+}
+
+.field-note {
+    color: #fde68a;
+    font-size: 0.85rem;
+    line-height: 1.35;
+}
+
+.empty-state {
+    color: #94a3b8;
+    border: 1px dashed var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.all-fields-panel {
+    margin: 0 0 1.5rem;
+}
+
+.all-fields-panel summary {
+    cursor: pointer;
+    color: var(--accent-glow);
+    font-weight: 800;
+    margin-bottom: 1rem;
+}
+
+.button-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: 1rem;
+}
+
+.button-row .primary-btn,
+.button-row .secondary-btn {
+    width: 100%;
+}
+
 /* Review Notes */
 .warning-box {
     border: 1px solid rgba(250, 204, 21, 0.35);
@@ -252,4 +374,15 @@ textarea:focus {
     margin-bottom: 1.5rem;
     color: #cbd5e1;
     font-size: 0.95rem;
+}
+
+@media (max-width: 700px) {
+    .input-grid,
+    .button-row {
+        grid-template-columns: 1fr;
+    }
+
+    .section-heading {
+        flex-direction: column;
+    }
 }

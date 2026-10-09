@@ -45,6 +45,10 @@ Site names, staff names, contact lines, and other identifying defaults belong in
 
 Start from `site_config.example.json`, copy it to `site_config.local.json`, and enter local production values there. The app merges those defaults into the parsed service data before checking missing template variables and generating documents.
 
+## Public Template Identity Check
+
+The test suite requires a private identity blocklist so skipped template-safety tests do not become normal practice. For local runs, create `template_identity_forbidden.local.txt` with forbidden strings separated by `||`, such as `Private Church Name||Pastor Name||Street Address`. For CI, set `PUBLIC_TEMPLATE_FORBIDDEN_STRINGS` with the same `||`-separated format.
+
 ## Troubleshooting
 
 * **Variables not filling?** Check `data_schema.md` to ensure template tags match exactly.

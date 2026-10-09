@@ -118,6 +118,34 @@ def _normalize_email_lines(text):
     return [line.rstrip() for line in text.splitlines() if line.strip()]
 
 
+def _strip_personnel_suffix(suffix):
+    return re.sub(r"^(?:with|featuring|feat\.?)\s+", "", suffix, flags=re.IGNORECASE).strip()
+
+
+def _join_personnel(values):
+    deduped = []
+    seen = set()
+    for value in values:
+        for part in value.split(";"):
+            cleaned = re.sub(r"\s+", " ", part).strip()
+            if not cleaned:
+                continue
+            normalized = cleaned.casefold()
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            deduped.append(cleaned)
+    return "; ".join(deduped)
+
+
+def _header_personnel(label, suffix=""):
+    cleaned = re.sub(r"\s+", " ", suffix).strip()
+    personnel = _strip_personnel_suffix(cleaned) if cleaned else ""
+    if label.startswith("new spirit"):
+        return "; ".join(part for part in ["New Spirit", personnel] if part)
+    return personnel
+
+
 def _match_music_header(line, source_type):
     stripped = line.strip()
     normalized = _clean_label(stripped)
@@ -125,15 +153,28 @@ def _match_music_header(line, source_type):
 
     for label in sorted(aliases, key=len, reverse=True):
         if normalized == label:
-            return aliases[label], ""
+            return aliases[label], "", _header_personnel(label)
 
         match = re.match(rf"^{re.escape(label)}\s*[:{DASH_CHARS}]\s*(.*)$", normalized)
         if match:
             raw_match = re.match(rf"^{re.escape(label)}\s*[:{DASH_CHARS}]\s*(.*)$", stripped, re.IGNORECASE)
             remainder = raw_match.group(1).strip() if raw_match else ""
-            return aliases[label], remainder
+            return aliases[label], remainder, ""
 
-    return None, None
+        detail_match = re.match(
+            rf"^{re.escape(label)}\s+((?:with|featuring|feat\.?)\b.+)$",
+            normalized,
+        )
+        if detail_match:
+            raw_match = re.match(
+                rf"^{re.escape(label)}\s+((?:with|featuring|feat\.?)\b.+)$",
+                stripped,
+                re.IGNORECASE,
+            )
+            suffix = raw_match.group(1).strip() if raw_match else detail_match.group(1).strip()
+            return aliases[label], "", _header_personnel(label, suffix)
+
+    return None, None, None
 
 
 def _is_text_or_footer_boundary(line):
@@ -155,12 +196,13 @@ def _is_text_or_footer_boundary(line):
 def _is_email_boundary(line, source_type):
     if _is_text_or_footer_boundary(line):
         return True
-    prefix, _ = _match_music_header(line, source_type)
+    prefix, _, _ = _match_music_header(line, source_type)
     return prefix is not None
 
 
 def _split_music_sections(text, source_type):
     sections = {}
+    header_personnel = {}
     current_prefix = None
 
     for line in _normalize_email_lines(text):
@@ -168,10 +210,12 @@ def _split_music_sections(text, source_type):
             current_prefix = None
             continue
 
-        detected_prefix, inline_content = _match_music_header(line, source_type)
+        detected_prefix, inline_content, personnel = _match_music_header(line, source_type)
         if detected_prefix:
             current_prefix = detected_prefix
             sections.setdefault(current_prefix, [])
+            if personnel:
+                header_personnel.setdefault(current_prefix, []).append(personnel)
             if inline_content:
                 sections[current_prefix].append(inline_content)
             continue
@@ -181,7 +225,7 @@ def _split_music_sections(text, source_type):
 
         sections[current_prefix].append(line.strip())
 
-    return sections
+    return sections, header_personnel
 
 
 def _strip_publisher_note(text):
@@ -337,10 +381,11 @@ def parse_email_text(text, source_type="organist"):
     if source_type not in HEADER_ALIASES:
         raise ValueError(f"Unknown email source_type: {source_type}")
 
-    sections = _split_music_sections(text, source_type)
+    sections, header_personnel = _split_music_sections(text, source_type)
 
     for prefix, lines in sections.items():
         title, composer, details = _parse_music_item(lines)
+        personnel = _join_personnel(header_personnel.get(prefix, []))
 
         prefixes = [prefix]
         if prefix == "offertory":
@@ -350,6 +395,6 @@ def parse_email_text(text, source_type="organist"):
             data[f"{output_prefix}_title"] = title
             data[f"{output_prefix}_composer"] = composer
             data[f"{output_prefix}_details"] = details
-            data[f"{output_prefix}_personnel"] = details
+            data[f"{output_prefix}_personnel"] = personnel
 
     return data

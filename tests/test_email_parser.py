@@ -66,6 +66,42 @@ def test_organist_email_keeps_new_spirit_offertory_out_of_prelude_details():
     assert "Get Outlook" not in data.get("exit_music_details", "")
 
 
+def test_organist_new_spirit_offertory_with_personnel_header_is_parsed():
+    text = """
+Prelude
+Trio in E Flat by Julius Reubke
+New Spirit Offertory with Donovan Beer, cello
+O the Deep, Deep Love of Jesus by Trevor Manor (Choristers Guild 2016)
+Postlude
+Recessional by Alexandre Guilmant
+"""
+
+    data = parse_email_text(text, source_type="organist")
+
+    assert data["prelude_title"] == "Trio in E Flat"
+    assert data["prelude_composer"] == "Julius Reubke"
+    assert data["prelude_details"] == ""
+    assert data["offertory_title"] == "O the Deep, Deep Love of Jesus"
+    assert data["offertory_composer"] == "Trevor Manor"
+    assert data["offertory_details"] == ""
+    assert data["offertory_personnel"] == "New Spirit; Donovan Beer, cello"
+    assert data["new_spirit_title"] == "O the Deep, Deep Love of Jesus"
+    assert data["postlude_title"] == "Recessional"
+
+
+def test_organist_new_spirit_personnel_is_deduplicated_across_headers():
+    text = """
+New Spirit Offertory
+New Spirit with Rachelle Ryan, percussion
+O the Deep, Deep Love of Jesus by Trevor Manor
+"""
+
+    data = parse_email_text(text, source_type="organist")
+
+    assert data["offertory_title"] == "O the Deep, Deep Love of Jesus"
+    assert data["offertory_personnel"] == "New Spirit; Rachelle Ryan, percussion"
+
+
 def test_choir_email_stops_at_text_sections_and_keeps_details_separate():
     data = parse_email_text(CHOIR_EMAIL, source_type="choir")
 

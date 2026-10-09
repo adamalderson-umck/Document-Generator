@@ -1,0 +1,89 @@
+"""Dynamic main-service tables; unknown operational assignments stay visible."""
+
+from copy import deepcopy
+from hashlib import sha256
+from pathlib import Path
+
+from docx import Document
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+
+
+def render_technical(service, cues, templates, directory):
+    if service['key'] != 'main':
+        return []
+    directory = Path(directory)
+    prefix = service['time'].replace(':', '')
+    targets = {kind: directory/f'{prefix}-{kind}.docx' for kind in ('cameras', 'sound')}
+    for target in targets.values():
+        if target.exists():
+            raise FileExistsError(target)
+    results = []
+    for kind, target in targets.items():
+        doc = Document(templates[kind])
+        if not doc.tables or len(doc.tables[0].rows) < 2 or not doc.paragraphs:
+            raise ValueError('Technical template requires header, table header and prototype row')
+        title = doc.paragraphs[0]
+        title.text = f"{service['date']} {service['time']} Worship Order and {'Camera' if kind == 'cameras' else 'Sound'} Plot"
+        for section in doc.sections:
+            for old in section._sectPr.findall(qn('w:vAlign')):
+                section._sectPr.remove(old)
+            alignment = OxmlElement('w:vAlign')
+            alignment.set(qn('w:val'), 'top')
+            section._sectPr.append(alignment)
+        table = doc.tables[0]
+        expected = 5 if kind == 'cameras' else 2
+        if len(table.columns) != expected:
+            raise ValueError('Unexpected technical template columns')
+        row_template = deepcopy(table.rows[1]._tr)
+        for row in list(table.rows)[1:]:
+            table._tbl.remove(row._tr)
+        repeat = OxmlElement('w:tblHeader')
+        table.rows[0]._tr.get_or_add_trPr().append(repeat)
+        findings = []
+        items = service['items']
+        if kind == 'cameras':
+            # Standing user rule: the broadcast ends before Exit Music.
+            end = next((index for index, item in enumerate(items)
+                        if item.get('kind') == 'exit_music'
+                        or item['source_wording'].strip().casefold() == 'exit music'), len(items))
+            items = items[:end]
+        previous_sound_scene = None
+        for item in items:
+            text = item.get('technical_wording') or item.get('display_wording') or item['source_wording']
+            text = '\n'.join(' — '.join(part.strip() for part in line.split('\t') if part.strip())
+                             for line in text.split('\n'))
+            # Only explicit item assignments with provenance are eligible.
+            assignment = cues.get(item['id'], cues.get('defaults', {}).get(item.get('cue_key'), {}))
+            confirmed = bool(assignment.get('evidence') or assignment.get('convention_id'))
+            instructions = assignment.get(kind) if confirmed and not item.get('cue_exception') else None
+            indices = [1, 2, 3, 4] if kind == 'cameras' else [0]
+            if instructions is not None and len(instructions) != len(indices):
+                raise ValueError('Cue column count mismatch')
+            sound_scene = (instructions[0] if kind == 'sound' and instructions is not None
+                           and instructions[0].strip() else None)
+            if sound_scene is not None and sound_scene == previous_sound_scene:
+                cell = table.rows[-1].cells[1]
+                cell.text += '\n' + text
+                continue
+            previous_sound_scene = sound_scene
+            table._tbl.append(deepcopy(row_template))
+            row = table.rows[-1]
+            row._tr.get_or_add_trPr().append(OxmlElement('w:cantSplit'))
+            for cell in row.cells:
+                cell.text = ''
+            row.cells[0 if kind == 'cameras' else 1].text = text
+            if instructions is None:
+                row.cells[indices[0]].text = 'REVIEW: ' + item.get('cue_exception', 'cue not confirmed')
+                findings.append({'code': 'cue_unknown', 'item_id': item['id']})
+            else:
+                for index, instruction in zip(indices, instructions):
+                    row.cells[index].text = instruction
+        with target.open('xb') as stream:
+            doc.save(stream)
+        results.append({'kind': kind, 'format': 'docx', 'path': str(target),
+                        'sha256': sha256(target.read_bytes()).hexdigest(),
+                        'item_ids': [i['id'] for i in items],
+                        'omitted_item_ids': [i['id'] for i in service['items'][len(items):]],
+                        'generation_status': 'generated', 'proof_status': 'pending', 'findings': findings})
+    return results

@@ -1,0 +1,24 @@
+{
+  "retained_closing_styles": [
+    "Text Benediction"
+  ],
+  "allowed_styles": [
+    "Liturgical Sunday",
+    "Date and Time",
+    "OOW Body",
+    "OOW Body--Indented",
+    "OOW Heading"
+  ],
+  "bulletin_label_aliases": {
+    "Prayer Requests, Pastoral Prayer, and the Lord’s Prayer": "Praying with Our Community",
+    "Prayer Requests, Pastoral Prayer, and the Lord's Prayer": "Praying with Our Community",
+    "Sanctuary Choir Anthem": "Anthem",
+    "Benediction Response": "Choral Response",
+    "Call to Worship": "Call to Worship"
+  },
+  "omit_labels_by_service": {
+    "early_traditional": [
+      "Trinity Chimes"
+    ]
+  }
+}
