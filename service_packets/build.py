@@ -1,11 +1,14 @@
-"""Publish a new editable draft revision without touching prior handoffs."""
+"""Maintain one current document per service/role, preserving human edits."""
 
 from datetime import date, timedelta
 from hashlib import sha256
 import json
 import os
+import shutil
 from pathlib import Path
+from tempfile import NamedTemporaryFile, TemporaryDirectory
 
+from .bulletin import apply_bulletin_rules
 from .idml import render_idml
 from .model import validate_packet
 from .technical import render_technical
@@ -17,13 +20,15 @@ def build_packet(packet, root, layout, cues, templates, *, phase="main"):
     if phase not in {"main", "early"}:
         raise ValueError("Unknown preparation phase")
     packet = validate_packet(packet)
+    apply_bulletin_rules(packet)
     state = Path(root)/'state/service_packets'
     state.mkdir(parents=True, exist_ok=True)
     lock = state/('build-'+packet['date']+'.lock')
     with lock.open('x', encoding='utf-8') as stream:
         stream.write(str(os.getpid()))
     try:
-        return _build_packet(packet, root, layout, cues, templates, phase)
+        with TemporaryDirectory(prefix='service-packet-') as scratch:
+            return _build_packet(packet, root, layout, cues, templates, phase, Path(scratch))
     finally:
         lock.unlink()
 
@@ -35,7 +40,7 @@ def _file_identity(path):
         return 'unavailable'
 
 
-def _build_packet(packet, root, layout, cues, templates, phase):
+def _build_packet(packet, root, layout, cues, templates, phase, directory):
     selected = [s for s in packet["services"] if (s["key"] == "main") == (phase == "main")]
     if 'baseline' not in packet:
         pointer = Path(root)/'state/service_packets/baseline.json'
@@ -48,6 +53,9 @@ def _build_packet(packet, root, layout, cues, templates, phase):
             packet['issues'].append({'code': 'baseline_unavailable', 'message': str(exc)})
     parent = Path(root)/'outputs'/packet['date']
     parent.mkdir(parents=True, exist_ok=True)
+    metadata = Path(root)/'state/service_packets/builds'/packet['date']/phase
+    metadata.mkdir(parents=True, exist_ok=True)
+    manifest_path = metadata/'manifest.json'
     dependencies = {str(path): _file_identity(path) for path in templates.values()}
     for source in packet.get('sources', []):
         if source.get('path'):
@@ -59,30 +67,23 @@ def _build_packet(packet, root, layout, cues, templates, phase):
                                  'dependencies': dependencies, 'renderer': code, 'phase': phase},
                                 sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
     expected_count = len(selected) + (3 if any(s['key'] == 'main' for s in selected) else 0)
-    for manifest in sorted(parent.glob('rev-*/manifest.json'), reverse=True):
-        try:
-            previous = json.loads(manifest.read_text(encoding='utf-8'))
-            artifacts = previous['artifacts']
-            if previous.get('build_identity') == identity:
-                if (len(artifacts) == expected_count
-                        and all(_file_identity(a['path']) == a['sha256'] for a in artifacts)):
-                    previous['reused'] = True
-                    return previous  # Proof state is retained, never upgraded by reuse.
-                break  # Never fall back past a newer edited or incomplete handoff.
-        except (OSError, ValueError, KeyError, TypeError):
-            continue
-    for number in range(1, 10000):
-        directory = parent/f'rev-{number:03d}'
-        try:
-            directory.mkdir()
-            break
-        except FileExistsError:
-            continue
-    else:
-        raise RuntimeError('Revision allocation exhausted')
-    result = {'date': packet['date'], 'phase': phase, 'revision': directory.name, 'artifacts': [],
+    previous = {}
+    try:
+        previous = json.loads(manifest_path.read_text(encoding='utf-8'))
+    except FileNotFoundError:
+        pass
+    # A damaged ownership record must not grant permission to replace files.
+    previous_artifacts = previous.get('artifacts', [])
+    if (previous.get('build_identity') == identity and len(previous_artifacts) == expected_count
+            and all(a.get('generation_status') == 'generated'
+                    and _file_identity(a['path']) == a['sha256'] for a in previous_artifacts)):
+        previous['reused'] = True
+        return previous
+    previous_by_name = {Path(a['path']).name: a for a in previous_artifacts}
+    result = {'date': packet['date'], 'phase': phase, 'revision': 'current', 'artifacts': [],
               'build_identity': identity, 'reused': False,
-              'issues': packet['issues'], 'review_path': str(directory/'review.md')}
+              'issues': packet['issues'], 'review_path': str(metadata/'review.md'),
+              'manifest_path': str(manifest_path), 'output_directory': str(parent)}
     if phase == 'main' and any(s['key'] != 'main' for s in packet['services']):
         result['issues'].append({'code': 'early_generation_deferred', 'message': 'Early bulletins await this Sunday\'s explicitly finalized main bulletin.'})
     baseline = packet.get('baseline')
@@ -139,16 +140,60 @@ def _build_packet(packet, root, layout, cues, templates, phase):
                 result['artifacts'].extend(artifacts)
             except (OSError, ValueError) as exc:
                 result['issues'].append({'code': 'technical_unavailable', 'service': 'main', 'message': str(exc)})
-    (directory/'service-packet.json').write_text(json.dumps(packet, ensure_ascii=False, indent=2), encoding='utf-8')
+    published = []
+    for artifact in result['artifacts']:
+        staged = Path(artifact['path'])
+        kind = artifact.get('kind', 'bulletin')
+        target = parent/f"{artifact['service']}-{kind}.{artifact['format']}"
+        old = previous_by_name.get(target.name, {})
+        current_hash = _file_identity(target)
+        generated_hash = old.get('generated_sha256')
+        if target.exists() and (not generated_hash or current_hash != generated_hash):
+            artifact = {**old, 'path': str(target), 'service': artifact['service'],
+                        'kind': kind, 'format': artifact['format'], 'sha256': current_hash,
+                        'generated_sha256': generated_hash,
+                        'generation_status': 'preserved_user_edit', 'proof_status': 'pending'}
+            result['issues'].append({'code': 'manual_edits_preserved',
+                                     'service': artifact['service'],
+                                     'message': f'{target.name}: existing edits preserved; reconcile source corrections in this file before delivery.'})
+        else:
+            # Recheck at publication, after rendering, so edits during the build survive.
+            if _file_identity(target) != current_hash:
+                raise RuntimeError(f'Output changed during publication: {target}')
+            # The staging directory is temporary; no old generated revision is retained.
+            # Write beside the target so replacement is atomic even across volumes.
+            with NamedTemporaryFile(dir=parent, prefix='.publish-', delete=False) as stream:
+                temporary = Path(stream.name)
+                with staged.open('rb') as source:
+                    shutil.copyfileobj(source, stream)
+            try:
+                if _file_identity(target) != current_hash:
+                    raise RuntimeError(f'Output changed during publication: {target}')
+                os.replace(temporary, target)
+            finally:
+                temporary.unlink(missing_ok=True)
+            artifact.update(path=str(target), generated_sha256=artifact['sha256'])
+        published.append(artifact)
+    # Keep the last usable document when its replacement could not be rendered.
+    names = {Path(a['path']).name for a in published}
+    for old in previous_artifacts:
+        path = Path(old['path'])
+        if path.name not in names and path.is_file():
+            published.append({**old, 'generation_status': 'previous_result_retained',
+                              'sha256': _file_identity(path)})
+            result['issues'].append({'code': 'previous_result_retained',
+                                     'message': f'{path.name}: no replacement generated; review before use.'})
+    result['artifacts'] = published
+    (metadata/'service-packet.json').write_text(json.dumps(packet, ensure_ascii=False, indent=2), encoding='utf-8')
     text = ['# Draft packet review', '', 'Native composition and visual review are pending.', '']
     for artifact in result['artifacts']:
-        text.append(f"- {Path(artifact['path']).name}: generated; proof pending.")
+        text.append(f"- {Path(artifact['path']).name}: {artifact['generation_status']}; proof {artifact['proof_status']}.")
         if artifact.get('findings'):
             text.append(f"  Review findings: {len(artifact['findings'])}.")
     for issue in result['issues']:
         text.append(f"- {issue.get('service', 'packet')}: {issue['code']} — {issue.get('message', '')}")
     Path(result['review_path']).write_text('\n'.join(text)+'\n', encoding='utf-8')
-    temporary = directory/'manifest.tmp'
+    temporary = metadata/'manifest.tmp'
     temporary.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
-    temporary.replace(directory/'manifest.json')
+    temporary.replace(manifest_path)
     return result

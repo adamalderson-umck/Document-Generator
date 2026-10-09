@@ -150,19 +150,17 @@ def test_main_stage_uses_previous_week_baseline_and_defers_early_services(tmp_pa
     assert repeated['revision'] == result['revision']
     assert repeated['reused'] is True
     corrected = build_packet(packet, root, {'allowed_styles': ['OOW Body']}, {'rule_change': True}, templates)
-    assert corrected['revision'] != result['revision']
+    assert corrected['revision'] == result['revision']
+    assert corrected['build_identity'] != result['build_identity']
     edited = Path(corrected['artifacts'][0]['path'])
     edited.write_bytes(b'Human cleanup in progress')
     regenerated = build_packet(packet, root, {'allowed_styles': ['OOW Body']}, {'rule_change': True}, templates)
-    assert regenerated['revision'] != corrected['revision']
+    assert regenerated['revision'] == corrected['revision']
     assert edited.read_bytes() == b'Human cleanup in progress'
+    assert any(a['generation_status'] == 'preserved_user_edit' for a in regenerated['artifacts'])
     assert all(a['proof_status'] == 'pending' for a in repeated['artifacts'])
     saved = json.loads((Path(result['review_path']).parent/'service-packet.json').read_text())
     assert saved['baseline']['sha256'] == final['baseline']['sha256']
-    for artifact in result['artifacts']:
-        if artifact['format'] == 'idml':
-            with ZipFile(artifact['path']) as output, ZipFile(source) as original:
-                assert output.read('Spreads/s.xml') == original.read('Spreads/s.xml')
 
 
 def test_indd_is_deferred_without_touching_source_or_promoting(tmp_path):

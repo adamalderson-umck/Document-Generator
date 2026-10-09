@@ -17,8 +17,21 @@ Requests carry an ID, allowlisted operation, absolute input/output/result paths 
 
 ## Registered on-demand entry point
 
-`Codex_ServicePacketDesktopWorker` is registered with no triggers, InteractiveToken logon, limited privileges, IgnoreNew instance policy and no Task Scheduler execution-time kill. Its sole spool is `C:/worktrees/Document-Generator/weekly-service-packet/state/service_packets/desktop`. The task executes `tools/service_packets/run_queued_job.ps1` using the existing repository Python environment. Retain this worktree and interpreter while the task references them; deployment relocation must update and reverify the task explicitly.
+`Codex_ServicePacketDesktopWorker` is registered with no triggers, InteractiveToken logon, limited privileges, IgnoreNew instance policy and no Task Scheduler execution-time kill. Its sole operational spool is `C:/Coding Projects/Document-Generator/state/service_packets/desktop`. The task executes a protected deployed copy of `tools/service_packets/run_queued_job.ps1` with its isolated Python runtime, outside the writable repository. The release and migration records are kept in `state/service_packets/`. Do not re-register the production task against writable repository code or its Python environment. The old worktree and its historical spool remain untouched but must not be used for dispatch after migration. A spool relocation requires idle ownership, preservation of pending/completed request state, task-action readback, and a bounded native acceptance check.
 
-An explicitly initiated dispatch writes an immutable input snapshot and an atomic `dispatch.json` request into that spool, then calls `Start-ScheduledTask -TaskName Codex_ServicePacketDesktopWorker`. Do not replace dispatch while a job/ownership lock is active. `service_packets.scheduled` validates cached completed results rather than launching them again. The preparation/finalization skills use this same entry point. The worker has no recurring timer of its own.
+An explicitly initiated dispatch writes an immutable input snapshot and an atomic `dispatch.json` request into that spool through `scheduled.queue_job`, then starts the existing registered task through the native Task Scheduler API:
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$scheduler = New-Object -ComObject Schedule.Service
+$scheduler.Connect()
+$task = $scheduler.GetFolder([string][char]92).GetTask('Codex_ServicePacketDesktopWorker')
+$instance = $task.Run($null)
+$instance.InstanceGuid
+```
+
+Use this call once per submitted request, without task-action parameters or alternate launch paths. The native API honors the scoped task execute permission; the PowerShell ScheduledTasks CIM interface remains denied in the sandbox. Do not expand WMI permissions or substitute `Start-ScheduledTask`. A returned instance does not establish completion: validate the matching result and output hash, and retain unresolved ownership on errors/timeouts. The sandbox identities have read/traverse on the root task folder (non-inheriting) and read/execute on this worker only; they must not be able to modify its task definition or deployed code.
+
+Do not replace dispatch while a job/ownership lock is active. `service_packets.scheduled` validates cached completed results rather than launching them again. The preparation/finalization skills use this same entry point. The worker has no recurring timer of its own.
 
 Real acceptance through Windows Task Scheduler exported a one-page Camera proof with exit code 0; its pixels matched the previously inspected proof. Automated ownership reconciliation is not implemented. The old Windows exporter is retained until the replacement Codex scheduled-runtime acceptance passes; check the cutover status record for its current state.

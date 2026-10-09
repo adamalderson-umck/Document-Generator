@@ -23,7 +23,8 @@ def test_missing_baseline_does_not_block_technical_outputs(tmp_path):
               'baseline': None, 'issues': []}
     first = build_packet(packet, tmp_path/'data', {}, {}, templates)
     second = build_packet(packet, tmp_path/'data', {}, {}, templates)
-    assert first['revision'] != second['revision']
+    assert first['revision'] == second['revision'] == 'current'
+    assert {a['path'] for a in first['artifacts']} == {a['path'] for a in second['artifacts']}
     assert len(first['artifacts']) == 3
     assert any(i['code'] == 'baseline_missing' for i in first['issues'])
     assert all(Path(a['path']).is_file() for a in first['artifacts'])
@@ -79,7 +80,8 @@ def test_early_phase_requires_same_week_final_and_preserves_common_members(
     edited = Path(result['artifacts'][0]['path'])
     edited.write_bytes(b'manual artist credit and layout edits')
     next_run = build_packet(packet, tmp_path/'data', layout, {}, {}, phase='early')
-    assert next_run['revision'] != result['revision']
+    assert next_run['revision'] == result['revision']
+    assert any(a['generation_status'] == 'preserved_user_edit' for a in next_run['artifacts'])
     assert edited.read_bytes() == b'manual artist credit and layout edits'
 
 

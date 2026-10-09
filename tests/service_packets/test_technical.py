@@ -1,7 +1,57 @@
+from copy import deepcopy
+
 from docx import Document
 import pytest
 
 from service_packets.technical import render_technical
+
+
+def test_sound_groups_only_adjacent_matching_scenes_and_preserves_camera_rows(tmp_path):
+    items = [{'id': str(i), 'source_wording': f'Element {i}'} for i in range(5)]
+    service = {'key': 'main', 'time': '10:30', 'date': '2099-09-20', 'items': items}
+    original = deepcopy(service)
+    cues = {str(i): {'evidence': [{'source_id': 'approved'}],
+                    'sound': [scene], 'cameras': ['Pulpit', '', '', '']}
+            for i, scene in enumerate(['Pulpit', 'Pulpit', 'Lectern', 'Pulpit', 'Pulpit'])}
+    out = tmp_path/'out'
+    out.mkdir()
+    results = {a['kind']: a for a in render_technical(service, cues, templates(tmp_path), out)}
+    sound_rows = Document(results['sound']['path']).tables[0].rows[1:]
+    assert [(r.cells[0].text, r.cells[1].text) for r in sound_rows] == [
+        ('Pulpit', 'Element 0\nElement 1'), ('Lectern', 'Element 2'),
+        ('Pulpit', 'Element 3\nElement 4')]
+    camera_rows = Document(results['cameras']['path']).tables[0].rows[1:]
+    assert [r.cells[0].text for r in camera_rows] == [i['source_wording'] for i in items]
+    assert results['sound']['item_ids'] == results['cameras']['item_ids'] == [i['id'] for i in items]
+    assert not results['sound']['findings']
+    assert service == original
+
+
+@pytest.mark.parametrize('barrier', ['unknown', 'unconfirmed', 'exception', 'blank'])
+def test_sound_keeps_unresolved_or_blank_scenes_separate_and_breaks_groups(tmp_path, barrier):
+    items = [{'id': str(i), 'source_wording': f'Element {i}', 'cue_key': 'pulpit'}
+             for i in range(4)]
+    confirmed = {'convention_id': 'approved', 'sound': ['Pulpit']}
+    cues = {'defaults': {'pulpit': confirmed}}
+    for i in (1, 2):
+        if barrier == 'exception':
+            items[i]['cue_exception'] = 'Check microphone assignment'
+        else:
+            cues[str(i)] = ({} if barrier == 'unknown' else
+                            {'sound': ['Pulpit']} if barrier == 'unconfirmed' else
+                            {'convention_id': 'approved', 'sound': ['']})
+    service = {'key': 'main', 'time': '10:30', 'date': '2099-09-20', 'items': items}
+    out = tmp_path/'out'
+    out.mkdir()
+    sound = next(a for a in render_technical(service, cues, templates(tmp_path), out)
+                 if a['kind'] == 'sound')
+    rows = Document(sound['path']).tables[0].rows[1:]
+    assert [r.cells[1].text for r in rows] == [i['source_wording'] for i in items]
+    if barrier == 'blank':
+        assert [r.cells[0].text for r in rows] == ['Pulpit', '', '', 'Pulpit']
+    else:
+        assert all('REVIEW:' in r.cells[0].text for r in rows[1:3])
+        assert [f['item_id'] for f in sound['findings']] == ['1', '2']
 
 
 def templates(tmp_path):

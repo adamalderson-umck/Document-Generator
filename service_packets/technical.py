@@ -48,27 +48,35 @@ def render_technical(service, cues, templates, directory):
                         if item.get('kind') == 'exit_music'
                         or item['source_wording'].strip().casefold() == 'exit music'), len(items))
             items = items[:end]
+        previous_sound_scene = None
         for item in items:
-            table._tbl.append(deepcopy(row_template))
-            row = table.rows[-1]
-            row._tr.get_or_add_trPr().append(OxmlElement('w:cantSplit'))
-            for cell in row.cells:
-                cell.text = ''
             text = item.get('technical_wording') or item.get('display_wording') or item['source_wording']
             text = '\n'.join(' — '.join(part.strip() for part in line.split('\t') if part.strip())
                              for line in text.split('\n'))
-            row.cells[0 if kind == 'cameras' else 1].text = text
             # Only explicit item assignments with provenance are eligible.
             assignment = cues.get(item['id'], cues.get('defaults', {}).get(item.get('cue_key'), {}))
             confirmed = bool(assignment.get('evidence') or assignment.get('convention_id'))
             instructions = assignment.get(kind) if confirmed and not item.get('cue_exception') else None
             indices = [1, 2, 3, 4] if kind == 'cameras' else [0]
+            if instructions is not None and len(instructions) != len(indices):
+                raise ValueError('Cue column count mismatch')
+            sound_scene = (instructions[0] if kind == 'sound' and instructions is not None
+                           and instructions[0].strip() else None)
+            if sound_scene is not None and sound_scene == previous_sound_scene:
+                cell = table.rows[-1].cells[1]
+                cell.text += '\n' + text
+                continue
+            previous_sound_scene = sound_scene
+            table._tbl.append(deepcopy(row_template))
+            row = table.rows[-1]
+            row._tr.get_or_add_trPr().append(OxmlElement('w:cantSplit'))
+            for cell in row.cells:
+                cell.text = ''
+            row.cells[0 if kind == 'cameras' else 1].text = text
             if instructions is None:
                 row.cells[indices[0]].text = 'REVIEW: ' + item.get('cue_exception', 'cue not confirmed')
                 findings.append({'code': 'cue_unknown', 'item_id': item['id']})
             else:
-                if len(instructions) != len(indices):
-                    raise ValueError('Cue column count mismatch')
                 for index, instruction in zip(indices, instructions):
                     row.cells[index].text = instruction
         with target.open('xb') as stream:

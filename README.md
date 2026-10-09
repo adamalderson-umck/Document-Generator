@@ -1,6 +1,12 @@
 # Document Streamlining Tool
 
-Automates weekly service document creation by extracting data from a source Word document and free-form music email inputs, then rendering Word templates.
+The weekly service-packet workflow runs from the main checkout at `C:/Coding Projects/Document-Generator`. Follow [service-packet operations](docs/service-packets/operations.md) and the repository's preparation/finalization skills.
+
+An ordinary Sunday has six editable deliverables in `outputs/YYYY-MM-DD/`: three bulletin IDML files and the main-service Camera, Sound, and Proclaim DOCX files. The main packet comes first; early bulletins follow the explicitly finalized main bulletin. Each deliverable has one stable filename. Corrections replace unedited generated files and preserve human edits. Internal build metadata lives under `state/service_packets/builds/`, and temporary rendering files are discarded.
+
+Older revision folders and unrelated local files are retained until separately reconciled. They are not the destination for new builds. Runtime configuration, templates, source documents, and generated files remain private local data, outside Git.
+
+The older Word-template web app remains available below.
 
 ## Quick Start
 
