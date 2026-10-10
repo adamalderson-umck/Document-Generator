@@ -25,7 +25,7 @@ For a saved INDD:
 
 1. Check sole-spool ownership. An unresolved timeout blocks all desktop work, regardless of lock age. Do not clear locks, kill applications, create another spool or call the old direct adapter.
 2. Snapshot the exact designated saved INDD into the configured spool. Submit `export_final_idml` with `scheduled.queue_job`; start only the registered task. Any open InDesign document, including an unsaved one, defers export. Never close or save the user's document.
-3. Preserve the request/result and call `finalize_worker_export(data_root, designation, request, result)`. This checks matching job/input/output hashes, native completion, fonts/links and original INDD identity, then invokes the finalizer while retaining original-file provenance. Do not pass nested native results directly into `finalize_packet` or mistake a PDF export for IDML.
+3. Preserve the worker-produced request/result and call `finalize_worker_export(data_root, designation, request, result)`. Do not pre-create `<job-id>-request.json`, `<job-id>.log`, or native request/result files; submit only through `scheduled.queue_job`. Any additional audit copy belongs in build metadata outside the spool. This checks matching job/input/output hashes, native completion, fonts/links and original INDD identity, then invokes the finalizer while retaining original-file provenance. Do not pass nested native results directly into `finalize_packet` or mistake a PDF export for IDML.
 
 ## Verify and report
 

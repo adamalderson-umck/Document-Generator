@@ -8,7 +8,7 @@ import sys
 import time
 
 from .jobs import accept_result, confined_path, run_job, validate_job, atomic_record
-from .native import launch_desktop_job
+from .native import launch_desktop_job, worker_launch_paths
 
 
 def queue_job(request, root):
@@ -30,6 +30,13 @@ def queue_job(request, root):
             if result['status'] == 'failed':
                 raise FileExistsError('Failed dispatch requires reconciliation')
         validate_job(request, root, datetime.now(timezone.utc))
+        reserved = worker_launch_paths(request['id'], root)
+        job_paths = {Path(request[key]).resolve() for key in ('input', 'output', 'result')}
+        for path in reserved:
+            if path in job_paths:
+                raise ValueError(f'Worker-owned path cannot be a job input/output/result: {path.name}')
+            if path.exists() or path.is_symlink():
+                raise FileExistsError(f'Worker-owned launch file already exists: {path.name}')
         atomic_record(dispatch, request)
     finally:
         lock.unlink()

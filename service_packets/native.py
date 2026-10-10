@@ -24,16 +24,22 @@ def export_saved_indd(request):
     return json.loads(Path(request['result']).read_text(encoding='utf-8-sig'))
 
 
+def worker_launch_paths(job_id, approved_root):
+    """Paths exclusively created by the launcher, never by submitting agents."""
+    root = Path(approved_root).resolve()
+    return root/(job_id+'-request.json'), root/(job_id+'.log')
+
+
 def launch_desktop_job(request, approved_root):
     """Launch only the fixed worker; jobs.run_job owns validation and serialization."""
     root = Path(approved_root).resolve()
-    request_path = root/(request['id']+'-request.json')
+    request_path, log_path = worker_launch_paths(request['id'], root)
     with request_path.open('x', encoding='utf-8') as stream:
         json.dump(request, stream, indent=2)
     powershell = Path(os.environ['SystemRoot'])/'System32/WindowsPowerShell/v1.0/powershell.exe'
     worker = Path(__file__).resolve().parents[1]/'tools/service_packets/worker.ps1'
     environment = {key: value for key, value in os.environ.items() if key.lower() != 'psmodulepath'}
-    with (root/(request['id']+'.log')).open('xb') as log:
+    with log_path.open('xb') as log:
         return subprocess.Popen([str(powershell), '-NoProfile', '-File', str(worker),
                                  '-RequestPath', str(request_path), '-ApprovedRoot', str(root)],
                                 stdout=log, stderr=subprocess.STDOUT, env=environment,
