@@ -1,0 +1,159 @@
+{
+  "type": "json_schema",
+  "json_schema": {
+    "name": "music_parser_grand_response",
+    "strict": true,
+    "schema": {
+      "type": "object",
+      "properties": {
+        "prelude_title": {
+          "type": "string"
+        },
+        "prelude_composer": {
+          "type": "string"
+        },
+        "prelude_details": {
+          "type": "string"
+        },
+        "prelude_personnel": {
+          "type": "string"
+        },
+        "offertory_title": {
+          "type": "string"
+        },
+        "offertory_composer": {
+          "type": "string"
+        },
+        "offertory_details": {
+          "type": "string"
+        },
+        "offertory_personnel": {
+          "type": "string"
+        },
+        "communion_piece_title": {
+          "type": "string"
+        },
+        "communion_piece_composer": {
+          "type": "string"
+        },
+        "communion_piece_details": {
+          "type": "string"
+        },
+        "communion_piece_personnel": {
+          "type": "string"
+        },
+        "postlude_title": {
+          "type": "string"
+        },
+        "postlude_composer": {
+          "type": "string"
+        },
+        "postlude_details": {
+          "type": "string"
+        },
+        "postlude_personnel": {
+          "type": "string"
+        },
+        "exit_music_title": {
+          "type": "string"
+        },
+        "exit_music_composer": {
+          "type": "string"
+        },
+        "exit_music_details": {
+          "type": "string"
+        },
+        "exit_music_personnel": {
+          "type": "string"
+        },
+        "introit_title": {
+          "type": "string"
+        },
+        "introit_composer": {
+          "type": "string"
+        },
+        "introit_details": {
+          "type": "string"
+        },
+        "introit_personnel": {
+          "type": "string"
+        },
+        "anthem_title": {
+          "type": "string"
+        },
+        "anthem_composer": {
+          "type": "string"
+        },
+        "anthem_details": {
+          "type": "string"
+        },
+        "anthem_personnel": {
+          "type": "string"
+        },
+        "prayer_response_title": {
+          "type": "string"
+        },
+        "prayer_response_composer": {
+          "type": "string"
+        },
+        "prayer_response_details": {
+          "type": "string"
+        },
+        "prayer_response_personnel": {
+          "type": "string"
+        },
+        "benediction_response_title": {
+          "type": "string"
+        },
+        "benediction_response_composer": {
+          "type": "string"
+        },
+        "benediction_response_details": {
+          "type": "string"
+        },
+        "benediction_response_personnel": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "prelude_title",
+        "prelude_composer",
+        "prelude_details",
+        "prelude_personnel",
+        "offertory_title",
+        "offertory_composer",
+        "offertory_details",
+        "offertory_personnel",
+        "communion_piece_title",
+        "communion_piece_composer",
+        "communion_piece_details",
+        "communion_piece_personnel",
+        "postlude_title",
+        "postlude_composer",
+        "postlude_details",
+        "postlude_personnel",
+        "exit_music_title",
+        "exit_music_composer",
+        "exit_music_details",
+        "exit_music_personnel",
+        "introit_title",
+        "introit_composer",
+        "introit_details",
+        "introit_personnel",
+        "anthem_title",
+        "anthem_composer",
+        "anthem_details",
+        "anthem_personnel",
+        "prayer_response_title",
+        "prayer_response_composer",
+        "prayer_response_details",
+        "prayer_response_personnel",
+        "benediction_response_title",
+        "benediction_response_composer",
+        "benediction_response_details",
+        "benediction_response_personnel"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

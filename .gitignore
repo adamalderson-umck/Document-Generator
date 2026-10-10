@@ -16,6 +16,7 @@ outputs/*
 state/service_packets/
 tmp/
 docx_templates/*.docx
+docx_templates/*.idml
 !docx_templates/.gitkeep
 site_config.local.json
 docx_templates_private_backup/
